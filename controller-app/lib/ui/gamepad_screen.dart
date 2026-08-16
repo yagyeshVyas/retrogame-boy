@@ -20,6 +20,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
   final Set<String> _held = {}; // dedupe: avoid re-sending down for a held button
   bool _abSwap = false;         // swap A<->B (NES: jump is usually B)
   ConnState _prevState = ConnState.disconnected;
+  int _lastLatencyShown = 0;
 
   @override
   void initState() {
@@ -33,20 +34,27 @@ class _GamepadScreenState extends State<GamepadScreen> {
   }
 
   /// Connection state changed: only act on REAL transitions (connect/disconnect).
-  /// Pongs arrive every second — if we cleared held buttons on every notification,
-  /// any held button would desync (TV keeps the down, phone forgets -> stuck keys).
+  /// On reconnect, RE-SEND held buttons as down (the TV cleared everything when we
+  /// dropped) — a mid-hold Wi-Fi blip therefore never feels like a stuck control.
   void _onConnChanged() {
     if (!mounted) return;
     final st = _conn.state;
-    if (st != _prevState) {
-      if (st == ConnState.reconnecting || st == ConnState.disconnected) {
-        _releaseAll(); // link dropped: tell the TV to release, start clean
-      } else if (st == ConnState.connected) {
-        _releaseAll(); // fresh link: release anything stale from before
+    final changed = st != _prevState;
+    if (changed) {
+      if (st == ConnState.connected) {
+        for (final b in _held.toList()) {
+          _conn.input(b, 'down'); // re-press whatever the user still holds
+        }
+      } else if (st == ConnState.reconnecting || st == ConnState.disconnected) {
+        _held.clear(); // link dropped; TV auto-released — start clean
       }
       _prevState = st;
     }
-    setState(() {});
+    // Only rebuild when something visible changed (state/latency), never per pong.
+    if (changed || _conn.latencyMs != _lastLatencyShown) {
+      _lastLatencyShown = _conn.latencyMs;
+      setState(() {});
+    }
   }
 
   /// Send 'up' for every held button and clear the set (phone/TV resync).

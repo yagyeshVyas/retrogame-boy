@@ -28,6 +28,7 @@ class Connection extends ChangeNotifier {
   bool _closed = false;       // true after dispose — never reconnect
   bool _handlingClose = false; // guard: onError + onDone fire for the SAME close
   int _attempt = 0;
+  DateTime _lastPongAt = DateTime.now(); // dead-link detection
 
   Connection({
     required this.host,
@@ -70,7 +71,7 @@ class Connection extends ChangeNotifier {
       final j = jsonDecode(raw as String) as Map<String, dynamic>;
       final m = decodeMessage(j);
       if (m is HelloAckMessage) { tvName = m.name; cores = m.cores; }
-      if (m is PongMessage) { latencyMs = DateTime.now().millisecondsSinceEpoch - m.ts; }
+      if (m is PongMessage) { latencyMs = DateTime.now().millisecondsSinceEpoch - m.ts; _lastPongAt = DateTime.now(); }
       if (m is StateMessage) { /* status pill could reflect pause */ }
       notifyListeners();
     } catch (_) {/* ignore malformed */}
@@ -79,6 +80,11 @@ class Connection extends ChangeNotifier {
   void _sendPing(Timer t) {
     if (state == ConnState.connected) {
       _channel?.sink.add(jsonEncode(PingMessage(DateTime.now().millisecondsSinceEpoch).toJson()));
+      // Dead-link detection: if the TV hasn't ponged for 5s, the socket is silently
+      // dead (Wi-Fi blip / TV hiccup). Force a clean reconnect instead of freezing.
+      if (DateTime.now().difference(_lastPongAt).inSeconds > 5) {
+        _onClosed();
+      }
     }
   }
 
