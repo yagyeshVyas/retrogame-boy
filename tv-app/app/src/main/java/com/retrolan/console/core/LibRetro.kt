@@ -147,21 +147,18 @@ object LibRetro {
     fun start() {
         if (running) return
         running = true
-        emuThread = thread(name = "retro-run") {
-            val frameMs = 16L // ~60fps target; loop adapts if the device is slow
-            var bitmap: android.graphics.Bitmap? = null
-            var scaled: android.graphics.Bitmap? = null   // pre-scaled (integer) render bitmap
-            var scaledKey = ""
-            // Audio output: 16-bit stereo PCM at the core's sample rate.
-            var audioTrack: android.media.AudioTrack? = null
-            val audioBuf = ByteArray(96 * 1024)
+        // ---- Audio thread: owns the AudioTrack; emulation thread only queues chunks,
+        //      so a slow/full audio device can never stall video rendering. ----
+        val audioQueue = java.util.concurrent.LinkedBlockingQueue<ByteArray>(16)
+        val audioThread = thread(name = "retro-audio") {
+            var at: android.media.AudioTrack? = null
             try {
                 val rate = nativeAudioRate()
                 val minBuf = android.media.AudioTrack.getMinBufferSize(
                     rate, android.media.AudioFormat.CHANNEL_OUT_STEREO,
                     android.media.AudioFormat.ENCODING_PCM_16BIT)
-                // 4x min buffer smooths underruns on slow 32-bit TVs (stutter fix)
-                audioTrack = android.media.AudioTrack(
+                // 2x min buffer: low latency (no late sound) with enough headroom.
+                at = android.media.AudioTrack(
                     android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -171,14 +168,22 @@ object LibRetro {
                         .setSampleRate(rate)
                         .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_STEREO)
                         .build(),
-                    (minBuf * 4).coerceAtLeast(64 * 1024),
-                    android.media.AudioTrack.MODE_STREAM,
-                    0)
-                audioTrack?.play()
+                    (minBuf * 2).coerceAtLeast(32 * 1024),
+                    android.media.AudioTrack.MODE_STREAM, 0)
+                at.play()
+                while (running) {
+                    val chunk = audioQueue.poll(80, java.util.concurrent.TimeUnit.MILLISECONDS)
+                        ?: continue
+                    try { at.write(chunk, 0, chunk.size) } catch (_: Exception) { break }
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "audio init failed: ${e.message}")
+                Log.w(TAG, "audio thread init failed: ${e.message}")
             }
-            var frames = 0L
+            try { at?.stop(); at?.release() } catch (_: Exception) {}
+        }
+        emuThread = thread(name = "retro-run") {
+            val frameMs = 16L // ~60fps target; loop adapts if the device is slow
+            var bitmap: android.graphics.Bitmap? = null
             var fpsAccum = 0L
             var fpsT0 = System.nanoTime()
             // Reused per-frame buffers (avoid GC pressure / allocation churn -> fps)
@@ -205,43 +210,24 @@ object LibRetro {
                                 val cfg = if (fmt == 2) android.graphics.Bitmap.Config.RGB_565
                                           else android.graphics.Bitmap.Config.ARGB_8888
                                 bitmap = android.graphics.Bitmap.createBitmap(w, h, cfg)
-                                scaled = null // size changed; re-scale next frame
                             }
                             frameBB!!.rewind() // copyPixelsFromBuffer consumes the buffer
                             bitmap?.copyPixelsFromBuffer(frameBB!!)
-                            // Pre-scale ONCE per surface size (integer scale, crisp pixels),
-                            // then blit — much faster than scaling every frame on a TV CPU.
-                            val key = "$w x $h x ${holderWidth}x${holderHeight}"
-                            if (scaled == null || scaledKey != key) {
-                                val sh = surfaceHolder
-                                if (sh != null) {
-                                    val sw = sh.surfaceFrame.width()
-                                    val shh = sh.surfaceFrame.height()
-                                    val s = (minOf(sw.toFloat() / w, shh.toFloat() / h)).toInt()
-                                        .coerceAtLeast(1)
-                                    scaled = android.graphics.Bitmap.createScaledBitmap(
-                                        bitmap!!, w * s, h * s, false)
-                                    scaledKey = key
-                                    // KEY SMOOTHNESS TRICK: pin the surface buffer to the
-                                    // game's own (integer-scaled) size. The canvas is then a
-                                    // pure 1:1 blit every frame, and the TV's display scaler
-                                    // (hardware) does the upscale — no per-frame CPU scaling.
-                                    try { sh.setFixedSize(w * s, h * s) } catch (_: Exception) {}
-                                }
-                            }
-                            drawFrame(bitmap, scaled)
+                            // Draw the FRESH frame every time (a cached scaled bitmap would
+                            // freeze the picture on frame 1 — never cache the render target).
+                            drawFrame(bitmap)
                         } catch (e: Exception) {
                             // A bad frame must never kill the emulator — log and continue.
                             Log.w(TAG, "frame render skipped: ${e.message}")
                         }
                     }
                 }
-                // Drain audio to the speaker.
+                // Queue audio for the audio thread (non-blocking; drop if it falls behind —
+                // keeps sound snappy, never freezes video).
                 try {
                     val n = nativeDrainAudio(audioBuf)
-                    if (n > 0) audioTrack?.write(audioBuf, 0, n)
+                    if (n > 0) audioQueue.offer(audioBuf.copyOfRange(0, n))
                 } catch (_: Exception) {}
-                frames++
                 fpsAccum++
                 val now = System.nanoTime()
                 if (now - fpsT0 > 2_000_000_000L) {
@@ -253,37 +239,33 @@ object LibRetro {
                 val sleep = if (elapsed < frameMs) (frameMs - elapsed).coerceAtLeast(1) else 0L
                 if (sleep > 0) { try { Thread.sleep(sleep) } catch (_: InterruptedException) { break } }
             }
-            try { audioTrack?.stop(); audioTrack?.release() } catch (_: Exception) {}
+            audioQueue.clear()
         }
     }
+
+    private val audioBuf = ByteArray(64 * 1024)
 
     @Volatile private var holderWidth = 0
     @Volatile private var holderHeight = 0
 
     /** Draw the game frame to the surface, preserving aspect ratio (no stretch). */
-    private fun drawFrame(bmp: android.graphics.Bitmap?, scaled: android.graphics.Bitmap?) {
+    private fun drawFrame(bmp: android.graphics.Bitmap?) {
         val holder = surfaceHolder ?: return
-        val src = scaled ?: bmp ?: return
+        val b = bmp ?: return
         val canvas = try { holder.lockCanvas() } catch (_: Exception) { return } ?: return
         try {
             holderWidth = canvas.width; holderHeight = canvas.height
             canvas.drawColor(android.graphics.Color.BLACK)
-            // Fast path: surface buffer is pinned to the game size -> pure 1:1 blit.
-            if (canvas.width == src.width && canvas.height == src.height) {
-                canvas.drawBitmap(src, 0f, 0f, null)
-            } else {
-                // Fallback (first frames): center with aspect ratio preserved.
-                val vw = canvas.width.toFloat()
-                val vh = canvas.height.toFloat()
-                val ar = src.width.toFloat() / src.height.toFloat()
-                var dw = vw
-                var dh = vw / ar
-                if (dh > vh) { dh = vh; dw = vh * ar }
-                val left = (vw - dw) / 2f
-                val top = (vh - dh) / 2f
-                canvas.drawBitmap(src, null,
-                    android.graphics.RectF(left, top, left + dw, top + dh), null)
-            }
+            val vw = canvas.width.toFloat()
+            val vh = canvas.height.toFloat()
+            val ar = b.width.toFloat() / b.height.toFloat()
+            var dw = vw
+            var dh = vw / ar
+            if (dh > vh) { dh = vh; dw = vh * ar }
+            val left = (vw - dw) / 2f
+            val top = (vh - dh) / 2f
+            canvas.drawBitmap(b, null,
+                android.graphics.RectF(left, top, left + dw, top + dh), null)
         } finally {
             try { holder.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
         }
