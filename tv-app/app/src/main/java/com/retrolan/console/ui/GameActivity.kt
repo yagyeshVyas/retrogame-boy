@@ -48,6 +48,8 @@ class GameActivity : AppCompatActivity() {
 
         // v1 loads a local file path; SAF full content streaming is a follow-up.
         val local = File(cacheDir, "current.$romName")
+        // Give LibRetro a cache dir so .zip ROMs can be extracted before loading.
+        LibRetro.cacheDir = cacheDir
         holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(h: SurfaceHolder) {
                 copyToCache(romUri, local)

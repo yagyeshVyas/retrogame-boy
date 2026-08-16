@@ -51,12 +51,25 @@ object LibRetro {
 
     /**
      * Load a ROM file and the correct core for it, chosen from the extension via [Cores].
-     * This is the one-call path that makes the whole supported-systems catalog playable.
+     * Handles `.zip` containers by extracting the inner ROM into the cache first (the user's
+     * own file, opened on this device — never fetched over the network).
      *
      * @return the friendly system name on success, or null on failure.
      */
     fun loadGameByPath(romPath: String): String? {
-        val ext = romPath.substringAfterLast('.', "").lowercase()
+        var path = romPath
+        var ext = path.substringAfterLast('.', "").lowercase()
+
+        // .zip (or 7z-like) container: extract the single inner ROM to cache and load that.
+        if (ext == Cores.ZIP_EXT) {
+            val inner = extractRomFromZip(path, cacheDir) ?: run {
+                Log.e(TAG, "no ROM found inside $romPath")
+                return null
+            }
+            path = inner
+            ext = path.substringAfterLast('.', "").lowercase()
+        }
+
         val def = Cores.resolve(ext) ?: run {
             Log.e(TAG, "no core for extension '.$ext' (supported: ${Cores.allExtensions})")
             return null
@@ -71,10 +84,37 @@ object LibRetro {
         if (!ok) return null
         coreName = def.core
         currentSystem = def
-        val loaded = nativeLoadGame(romPath, def.core)
-        if (!loaded) { Log.e(TAG, "load_game failed for $romPath with ${def.core}"); return null }
-        Log.i(TAG, "playing ${def.system} on ${def.core}: $romPath")
+        val loaded = nativeLoadGame(path, def.core)
+        if (!loaded) { Log.e(TAG, "load_game failed for $path with ${def.core}"); return null }
+        Log.i(TAG, "playing ${def.system} on ${def.core}: $path")
         return def.system
+    }
+
+    /** Cache dir the app writes extracted zipped ROMs to (set from GameActivity). */
+    @Volatile var cacheDir: java.io.File? = null
+
+    /** Extract the first supported ROM from a .zip into the cache; returns the inner path. */
+    private fun extractRomFromZip(zipPath: String, cache: java.io.File?): String? {
+        val dir = cache ?: return null
+        dir.mkdirs()
+        try {
+            java.util.zip.ZipFile(zipPath).use { zip ->
+                val entries = zip.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    if (entry.isDirectory) continue
+                    val name = entry.name.substringAfterLast('/')
+                    val innerExt = name.substringAfterLast('.', "").lowercase()
+                    if (Cores.resolve(innerExt) == null) continue
+                    val out = File(dir, "extracted_${System.currentTimeMillis()}.$innerExt")
+                    out.outputStream().use { os -> zip.getInputStream(entry).copyTo(os) }
+                    return out.absolutePath
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "extractRomFromZip failed: ${e.message}")
+        }
+        return null
     }
 
     /** A ROM's full path (override in tests / no-content builds). */

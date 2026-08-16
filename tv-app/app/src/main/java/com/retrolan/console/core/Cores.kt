@@ -53,14 +53,24 @@ object Cores {
 
     val coreNames: List<String> = list.map { it.core }
 
+    /** Containers we open and peek inside (e.g. a .zip holding one ROM). */
+    const val ZIP_EXT = "zip"
+
     /** Pick the first core that accepts this ROM extension, else null. */
     fun resolve(extension: String): CoreDef? {
         val e = extension.lowercase()
         return list.firstOrNull { e in it.extensions }
     }
 
+    /**
+     * Detect the system for a ROM *inside* a container. Used when a .zip wraps a single
+     * game file — we look at the inner file's extension to pick the right core.
+     */
+    fun resolveInner(innerName: String): CoreDef? =
+        resolve(innerName.substringAfterLast('.', ""))
+
     /** All accepted ROM extensions (for the SAF picker filter). */
-    val allExtensions: Set<String> = list.flatMap { it.extensions }.toSet()
+    val allExtensions: Set<String> = list.flatMap { it.extensions }.toSet() + ZIP_EXT
 
     /** Default core names shown in hello_ack (keep it compact). */
     val defaultHelloCores: List<String> = listOf(

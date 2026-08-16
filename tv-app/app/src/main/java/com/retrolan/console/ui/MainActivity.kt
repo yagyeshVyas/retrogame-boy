@@ -60,6 +60,13 @@ class MainActivity : AppCompatActivity() {
         grid.adapter = adapter
 
         pickButton.setOnClickListener { folderPicker.launch(null) }
+        // Fallback when the TV has no file browser (SAF picker unavailable):
+        // scan the Download collection directly via MediaStore — no picker needed.
+        findViewById<android.widget.Button>(R.id.scan_downloads).setOnClickListener {
+            val found = scanDownloads()
+            status.text = getString(R.string.select_rom) +
+                " · $found game${if (found == 1) "" else "s"} from Downloads · tap OK to play"
+        }
 
         // Restore last-used folder (persistent across launches).
         prefs.getString("rom_folder", null)?.let { Uri.parse(it) }?.let {
@@ -108,6 +115,14 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
+    /** Friendly system name for a file — peeks inside .zip containers when possible. */
+    private fun systemFor(name: String): String {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        val coreDef = Cores.resolve(ext)
+        if (coreDef != null) return coreDef.system
+        return if (ext == Cores.ZIP_EXT) "Archive (ROM zip)" else "Unknown system"
+    }
+
     /** Enumerate ROM files (user-owned, local) in the chosen folder. */
     private fun scanFolder(uri: Uri): List<RomEntry> {
         val out = mutableListOf<RomEntry>()
@@ -119,14 +134,50 @@ class MainActivity : AppCompatActivity() {
             while (c.moveToNext()) {
                 val name = c.getString(0)
                 if (name != null && isRom(name)) {
-                    val ext = name.substringAfterLast('.', "").lowercase()
-                    val coreDef = Cores.resolve(ext)
-                    val system = coreDef?.system ?: "Unknown system"
-                    out.add(RomEntry(name, uri.buildUpon().appendPath(name).build(), system))
+                    out.add(RomEntry(name, uri.buildUpon().appendPath(name).build(), systemFor(name)))
                 }
             }
         }
         return out.sortedBy { it.system + it.name }
+    }
+
+    /**
+     * Fallback scan of the system Downloads collection via MediaStore — no SAF folder
+     * picker needed. Use this when the TV has no file-browser app to handle the picker
+     * intent (e.g. many ONN / Google TV boxes). Reads user-owned files only.
+     */
+    private fun scanDownloads(): Int {
+        val out = mutableListOf<RomEntry>()
+        val projection = arrayOf(
+            android.provider.MediaStore.Downloads._ID,
+            android.provider.MediaStore.Downloads.DISPLAY_NAME)
+        try {
+            contentResolver.query(
+                android.provider.MediaStore.Downloads.getContentUri(
+                    "external"), projection, null, null, null)?.use { c ->
+                val nameCol = c.getColumnIndexOrThrow(
+                    android.provider.MediaStore.Downloads.DISPLAY_NAME)
+                while (c.moveToNext()) {
+                    val name = c.getString(nameCol) ?: continue
+                    if (!isRom(name)) continue
+                    val system = systemFor(name)
+                    // Openable content URI for this MediaStore entry.
+                    val id = c.getLong(c.getColumnIndexOrThrow(
+                        android.provider.MediaStore.Downloads._ID))
+                    val uri = android.content.ContentUris.withAppendedId(
+                        android.provider.MediaStore.Downloads.getContentUri("external"), id)
+                    out.add(RomEntry(name, uri, system))
+                }
+            }
+        } catch (_: Exception) {
+            // Best-effort; fall back to picker if MediaStore unavailable.
+        }
+        adapter?.submit(out)
+        if (out.isEmpty()) {
+            status.text = getString(R.string.no_rom_folder) +
+                " — put ROMs in Downloads or use PICK ROM FOLDER"
+        }
+        return out.size
     }
 
     private fun isRom(name: String): Boolean {
