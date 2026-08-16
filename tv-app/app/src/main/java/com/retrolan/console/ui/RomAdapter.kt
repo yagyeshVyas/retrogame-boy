@@ -9,8 +9,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.retrolan.console.R
 
 /**
- * D-pad friendly grid adapter showing ROM cards. Art is a placeholder (no copyrighted
- * box art is bundled); users can later point cards at their own images.
+ * D-pad friendly grid adapter showing your ROM files as large cards with a system badge.
+ * Card art is a placeholder (no copyrighted box art is bundled); users can later point
+ * cards at their own images. Emphasizes the game title, navigable with a TV remote/DPad.
  */
 class RomAdapter(
     private val onClick: (RomEntry) -> Unit,
@@ -23,8 +24,10 @@ class RomAdapter(
 
     class VH(view: View, private val click: (RomEntry) -> Unit) : RecyclerView.ViewHolder(view) {
         private val title: TextView = view.findViewById(R.id.rom_title)
+        private val system: TextView = view.findViewById(R.id.rom_system)
         fun bind(rom: RomEntry) {
             title.text = rom.name.substringBeforeLast('.')
+            system.text = rom.system
             itemView.setOnClickListener { click(rom) }
             itemView.isFocusable = true
             itemView.isClickable = true

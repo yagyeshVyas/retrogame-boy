@@ -54,7 +54,7 @@ class GameActivity : AppCompatActivity() {
                 val system = LibRetro.loadGameByPath(local.absolutePath)
                 if (system != null) {
                     LibRetro.start()
-                    Toast.makeText(this@GameActivity, "Playing: $system (local file)", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@GameActivity, "▶ $system — ${romName.substringBeforeLast('.')}", Toast.LENGTH_LONG).show()
                 } else {
                     Toast.makeText(this@GameActivity, "No core for that ROM", Toast.LENGTH_LONG).show()
                 }
