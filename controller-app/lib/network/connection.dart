@@ -72,10 +72,17 @@ class Connection extends ChangeNotifier {
       final m = decodeMessage(j);
       if (m is HelloAckMessage) { tvName = m.name; cores = m.cores; }
       if (m is PongMessage) { latencyMs = DateTime.now().millisecondsSinceEpoch - m.ts; _lastPongAt = DateTime.now(); }
-      if (m is StateMessage) { /* status pill could reflect pause */ }
+      if (m is StateMessage) {
+        // 'resync' = the TV's emulator relay restarted and cleared the core's button
+        // state — the UI must re-send whatever it is still holding.
+        if (m.status == 'resync') onResync?.call();
+      }
       notifyListeners();
     } catch (_) {/* ignore malformed */}
   }
+
+  /// Called when the TV asks us to re-send held buttons (relay restart).
+  VoidCallback? onResync;
 
   void _sendPing(Timer t) {
     if (state == ConnState.connected) {

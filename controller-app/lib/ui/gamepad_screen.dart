@@ -27,7 +27,16 @@ class _GamepadScreenState extends State<GamepadScreen> {
     super.initState();
     _conn = Connection(host: widget.host, port: widget.port, player: widget.player)
       ..deviceLabel = 'FlutterController-${widget.player}'
-      ..addListener(_onConnChanged);
+      ..addListener(_onConnChanged)
+      ..onResync = () {
+          // TV's emulator relay restarted and cleared core state: re-press whatever
+          // we're still holding so no button is lost (fixes auto-walk after a blip).
+          if (mounted && _conn.state == ConnState.connected) {
+            for (final b in _held.toList()) {
+              _conn.input(b, 'down');
+            }
+          }
+        };
     _conn.connect();
     SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);

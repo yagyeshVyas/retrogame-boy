@@ -100,6 +100,11 @@ class GameActivity : AppCompatActivity() {
                 try {
                     val client = HttpClient(CIO) { install(WebSockets) }
                     client.webSocket("ws://127.0.0.1:8877") {
+                        // A relay (re)connect means the main process may have dropped
+                        // input messages during the gap — clear any stale held buttons
+                        // in the core so a lost 'up' can never leave a key stuck (the
+                        // "character walks left by itself" bug).
+                        LibRetro.clearButtons()
                         send(Frame.Text(
                             """{"type":"hello","device":"emulator","role":"emulator-relay"}"""))
                         for (frame in incoming) {

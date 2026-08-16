@@ -76,7 +76,18 @@ object RetroServer {
                                     // The emulator process identifies itself as a relay; from
                                     // then on it receives copies of every controller input.
                                     val role = obj["role"]?.jsonPrimitive?.content
-                                    if (role == "emulator-relay") { isRelay = true; relay = ws }
+                                    if (role == "emulator-relay") {
+                                        isRelay = true
+                                        relay = ws
+                                        // A relay (re)connect means the core's button state may
+                                        // have been cleared (stale held keys die with the old
+                                        // relay). Ask every controller to re-send what it holds.
+                                        for (c in controllers) {
+                                            if (c != ws && c.isActive) {
+                                                try { c.send("""{"type":"state","status":"resync","paused":false,"fps":0}""") } catch (_: Exception) {}
+                                            }
+                                        }
+                                    }
                                 }
                                 "rom_upload" -> {
                                     val nm = obj["name"]?.jsonPrimitive?.content
