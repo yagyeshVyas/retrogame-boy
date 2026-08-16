@@ -14,6 +14,8 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
+        // Universal build: bundle BOTH ABIs so ONE APK works on any Android TV/ONN box.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         // ABI selection handled by the splits block below (arm64 + x86_64, per-ABI APKs).
         externalNativeBuild {
             cmake { cFlags += "-std=c11" } // retro_core_jni.c is C
@@ -26,16 +28,6 @@ android {
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
-        }
-    }
-
-    // Per-ABI splits: separate arm64 + x86_64 APKs (each ~90MB instead of one 180MB+).
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "x86_64")
-            isUniversalApk = false
         }
     }
 
