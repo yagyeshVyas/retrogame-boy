@@ -27,12 +27,31 @@ class RomAdapter(
     class VH(view: View, private val click: (RomEntry) -> Unit) : RecyclerView.ViewHolder(view) {
         private val title: TextView = view.findViewById(R.id.rom_title)
         private val system: TextView = view.findViewById(R.id.rom_system)
+        private val poster: android.widget.ImageView = view.findViewById(R.id.rom_poster)
         fun bind(rom: RomEntry) {
-            title.text = rom.name.substringBeforeLast('.')
+            title.text = prettyName(rom.name)
             system.text = rom.system
+            if (rom.posterUri != null) {
+                try {
+                    poster.setImageURI(rom.posterUri)
+                } catch (_: Exception) {
+                    poster.setImageResource(R.drawable.art_placeholder)
+                }
+            } else {
+                poster.setImageResource(R.drawable.art_placeholder)
+            }
             itemView.setOnClickListener { click(rom) }
             itemView.isFocusable = true
             itemView.isClickable = true
+        }
+
+        /** "super_game_v2.nes" -> "Super Game V2" — clean title for the library. */
+        private fun prettyName(fileName: String): String {
+            val base = fileName.substringBeforeLast('.')
+            val words = base.replace('_', ' ').replace('-', ' ').trim().split(Regex("\\s+"))
+            return words.joinToString(" ") { w ->
+                if (w.isEmpty()) w else w.first().uppercase() + w.drop(1)
+            }
         }
     }
 

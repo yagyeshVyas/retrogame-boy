@@ -254,10 +254,23 @@ class MainActivity : AppCompatActivity() {
                 walkForRoms(f, out)
             } else {
                 if (isRom(f.name)) {
-                    out[f.name] = RomEntry(f.name, Uri.fromFile(f), systemFor(f.name))
+                    out[f.name] = RomEntry(f.name, Uri.fromFile(f), systemFor(f.name), findPoster(f))
                 }
             }
         }
+    }
+
+    /** Look for a user-provided local cover image next to a ROM file (<name>.png/jpg/webp). */
+    private fun findPoster(romFile: File): Uri? {
+        val base = romFile.name.substringBeforeLast('.')
+        val parent = romFile.parentFile ?: return null
+        for (ext in arrayOf("png", "jpg", "jpeg", "webp")) {
+            val img = File(parent, "$base.$ext")
+            if (img.exists()) return Uri.fromFile(img)
+            val img2 = File(parent, "${base}_cover.$ext")
+            if (img2.exists()) return Uri.fromFile(img2)
+        }
+        return null
     }
 
     private fun isRom(name: String): Boolean {
@@ -273,4 +286,9 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-data class RomEntry(val name: String, val uri: Uri, val system: String = "Unknown")
+data class RomEntry(
+    val name: String,
+    val uri: Uri,
+    val system: String = "Unknown",
+    val posterUri: Uri? = null,   // user-provided local cover art (<name>.png/jpg/webp) if present
+)

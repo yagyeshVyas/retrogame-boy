@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Card background: dark rounded surface for the ROM library grid. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#16161D" />
+    <corners android:radius="10dp" />
+    <stroke android:width="1dp" android:color="#26262F" />
+</shape>

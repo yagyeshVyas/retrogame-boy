@@ -1,23 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ROM library card: poster art (user-provided local image, else placeholder), title, system. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="vertical" android:background="@color/card"
-    android:layout_margin="8dp" android:padding="16dp"
-    android:focusable="true" android:clickable="true">
-    <!-- Game art placeholder (no copyrighted box art bundled). -->
-    <View
-        android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="4"
-        android:background="@drawable/art_placeholder" />
+    android:orientation="vertical"
+    android:background="@drawable/card_bg"
+    android:padding="8dp"
+    android:focusable="true"
+    android:clickable="true">
+
+    <ImageView
+        android:id="@+id/rom_poster"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:scaleType="centerCrop"
+        android:contentDescription="Game cover"
+        android:src="@drawable/art_placeholder" />
+
     <TextView
         android:id="@+id/rom_title"
-        android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="2"
-        android:gravity="bottom"
-        android:textColor="@color/ink" android:textSize="15sp"
-        android:maxLines="2" android:ellipsize="end" android:layout_marginTop="8dp" />
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/ink"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="Game" />
+
     <TextView
         android:id="@+id/rom_system"
-        android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:textColor="@color/muted" android:textSize="11sp" android:layout_marginTop="2dp" />
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/muted"
+        android:textSize="11sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="System" />
 </LinearLayout>
