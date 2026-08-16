@@ -67,6 +67,11 @@ class MainActivity : AppCompatActivity() {
             status.text = getString(R.string.select_rom) +
                 " · $found game${if (found == 1) "" else "s"} from Downloads · tap OK to play"
         }
+        // Scan the ENTIRE storage recursively for any playable ROM file anywhere.
+        findViewById<android.widget.Button>(R.id.scan_all).setOnClickListener {
+            val found = scanAllStorage()
+            status.text = "Found $found game${if (found == 1) "" else "s"} on this TV · tap OK to play"
+        }
 
         // Restore last-used folder (persistent across launches).
         prefs.getString("rom_folder", null)?.let { Uri.parse(it) }?.let {
@@ -180,9 +185,66 @@ class MainActivity : AppCompatActivity() {
         return out.size
     }
 
+    /**
+     * Scan the ENTIRE external storage for playable ROM files (all systems/formats).
+     * Uses MediaStore File collection (indexes the whole /sdcard) + a recursive File walk
+     * as a fallback, so a game file in ANY folder shows up. User-owned local files only.
+     */
+    private fun scanAllStorage(): Int {
+        val out = LinkedHashMap<String, RomEntry>() // dedupe by name
+        // 1) MediaStore File collection — indexes everything the media provider has seen.
+        try {
+            val uri = android.provider.MediaStore.Files.getContentUri("external")
+            contentResolver.query(uri, arrayOf(
+                android.provider.MediaStore.Files.FileColumns._ID,
+                android.provider.MediaStore.Files.FileColumns.DISPLAY_NAME,
+                android.provider.MediaStore.Files.FileColumns.DATA),
+                null, null, null)?.use { c ->
+                val idCol = c.getColumnIndex(android.provider.MediaStore.Files.FileColumns._ID)
+                val nameCol = c.getColumnIndex(android.provider.MediaStore.Files.FileColumns.DISPLAY_NAME)
+                while (c.moveToNext()) {
+                    val name = c.getString(nameCol) ?: continue
+                    if (!isRom(name)) continue
+                    val id = if (idCol >= 0) c.getLong(idCol) else 0L
+                    val uri0 = android.content.ContentUris.withAppendedId(uri, id)
+                    out[name] = RomEntry(name, uri0, systemFor(name))
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 2) Recursive File walk fallback (finds files MediaStore hasn't indexed yet).
+        try {
+            val root = File("/sdcard")
+            if (root.exists()) walkForRoms(root, out)
+        } catch (_: Exception) {}
+
+        val sorted = out.values.sortedBy { it.system + it.name }
+        adapter?.submit(sorted)
+        if (sorted.isEmpty()) {
+            status.text = "No games found — put ROM files on the TV (e.g. Downloads)"
+        }
+        return sorted.size
+    }
+
+    private fun walkForRoms(dir: File, out: MutableMap<String, RomEntry>) {
+        val children = dir.listFiles() ?: return
+        for (f in children) {
+            if (f.isDirectory) {
+                // skip heavy non-rom dirs
+                val n = f.name.lowercase()
+                if (n in setOf("android", "phone", "obb", "cache", "alarms", "notifications", "ringtones", "podcasts", "audiobooks")) continue
+                walkForRoms(f, out)
+            } else {
+                if (isRom(f.name)) {
+                    out[f.name] = RomEntry(f.name, Uri.fromFile(f), systemFor(f.name))
+                }
+            }
+        }
+    }
+
     private fun isRom(name: String): Boolean {
         val e = name.substringAfterLast('.', "").lowercase()
-        // All supported systems' ROM extensions — user-owned local files only.
+        // All supported systems' ROM extensions + containers — user-owned local files only.
         return e in Cores.allExtensions
     }
 
