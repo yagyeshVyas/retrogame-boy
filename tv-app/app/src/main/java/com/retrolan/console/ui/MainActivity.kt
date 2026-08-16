@@ -217,6 +217,11 @@ class MainActivity : AppCompatActivity() {
             val root = File("/sdcard")
             if (root.exists()) walkForRoms(root, out)
         } catch (_: Exception) {}
+        // 3) The app's OWN external files dir — always readable under scoped storage.
+        //    (ADB-pushed ROMs placed here are seen even when MediaStore hasn't indexed them.)
+        try {
+            getExternalFilesDir(null)?.let { walkForRoms(it, out) }
+        } catch (_: Exception) {}
 
         val sorted = out.values.sortedBy { it.system + it.name }
         adapter?.submit(sorted)
@@ -230,9 +235,10 @@ class MainActivity : AppCompatActivity() {
         val children = dir.listFiles() ?: return
         for (f in children) {
             if (f.isDirectory) {
-                // skip heavy non-rom dirs
+                // skip heavy non-rom dirs (but NOT 'android' — our own ROMs live under
+                // /sdcard/Android/data/com.retrolan.console/files/ and must be reachable)
                 val n = f.name.lowercase()
-                if (n in setOf("android", "phone", "obb", "cache", "alarms", "notifications", "ringtones", "podcasts", "audiobooks")) continue
+                if (n in setOf("phone", "obb", "cache", "alarms", "notifications", "ringtones", "podcasts", "audiobooks")) continue
                 walkForRoms(f, out)
             } else {
                 if (isRom(f.name)) {
