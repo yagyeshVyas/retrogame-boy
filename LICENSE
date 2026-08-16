@@ -1,0 +1,42 @@
+# Dual-License Notice (top-level)
+
+This repository is **dual-licensed** by scope:
+
+## /tv-app — GNU General Public License v3.0 (GPLv3)
+
+The Android TV host application, including its JNI bridge to libretro emulator
+cores (*/tv-app/**), is licensed under the GNU General Public License v3.0
+(GPLv3). Rationale: the emulator cores it statically links (fceumm, snes9x,
+gambatte, ...) are themselves GPL-licensed. Distributing a binary that links
+them requires the containing work to be offered under a GPL-compatible license.
+
+The full GPLv3 text is in `tv-app/LICENSE`.
+
+## /controller-app, /protocol, /docs, /tools — MIT License
+
+The Flutter controller application, the shared protocol schema, documentation,
+and reference tooling are licensed under the MIT License:
+
+    MIT License
+
+    Copyright (c) 2026 RetroLAN Console contributors
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+The GPLv3 text that governs /tv-app is provided at `tv-app/LICENSE`.

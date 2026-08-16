@@ -1,0 +1,13 @@
+{
+  "name": "retrolan-protocol-tools",
+  "version": "1.0.0",
+  "description": "Reference implementation of the RetroLAN wire protocol",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}

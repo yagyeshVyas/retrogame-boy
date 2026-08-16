@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>RetroLAN — Controller Simulator</title>
+<style>
+  :root{
+    --bg:#0D0D12;
+    --panel:#17171F;
+    --purple:#A13BFF;
+    --purple-soft:rgba(161,59,255,.16);
+    --cyan:#22D3EE;
+    --cyan-soft:rgba(34,211,238,.14);
+    --red:#FF3B6B;
+    --green:#3BFFB8;
+    --amber:#FFC23B;
+    --ink:#EDEDF2;
+    --muted:#8A8A9E;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;touch-action:manipulation;}
+  html,body{margin:0;height:100%;background:radial-gradient(120% 90% at 50% -10%, #1A1A26 0%, var(--bg) 55%, #09090D 100%);color:var(--ink);
+    font-family:"Segoe UI Rounded","Arial Rounded MT Bold",ui-rounded,system-ui,"SF Pro Rounded",sans-serif;overflow:hidden;}
+  body{display:flex;flex-direction:column;align-items:center;padding:14px 18px;}
+  .top{display:flex;align-items:center;gap:12px;justify-content:space-between;width:100%;max-width:760px;margin-bottom:10px;}
+  .pill{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid rgba(255,255,255,.07);border-radius:999px;
+    padding:6px 14px;font-size:12px;color:var(--muted);letter-spacing:.4px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:#555;}
+  .dot.connected{background:var(--green);box-shadow:0 0 8px var(--green);}
+  .dot.connecting{background:var(--amber);animation:blink 1s infinite;}
+  @keyframes blink{50%{opacity:.25;}}
+  .lat{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600;}
+  .controls{display:flex;width:100%;max-width:760px;justify-content:center;gap:16px;align-items:center;}
+  .row{display:flex;justify-content:space-between;width:100%;max-width:760px;position:relative;flex:1;min-height:320px;}
+  /* -------- face cluster (right) -------- */
+  .face{position:relative;width:230px;height:230px;}
+  .face button{position:absolute;width:64px;height:64px;border-radius:50%;border:1.5px solid rgba(255,255,255,.16);
+    background:var(--purple-soft);color:#fff;font-size:20px;font-weight:700;font-family:inherit;
+    transition:transform .05s, box-shadow .09s, background .09s, opacity .09s;}
+  .face button:active,.face button.pressed{background:var(--purple);box-shadow:0 0 26px var(--purple),0 0 60px var(--purple-soft);transform:scale(.94);}
+  .btnA{right:84px;top:132px;} .btnB{right:16px;top:86px;} .btnY{right:84px;top:40px;} .btnX{right:152px;top:86px;}
+  .btnA{background:var(--green);opacity:.28;}
+  .btnA:active{background:var(--green);opacity:1;}
+  /* keep purple family accent but give each a tint via label color */
+  /* -------- d-pad cluster (left) -------- */
+  .dpad{width:190px;height:190px;position:relative;}
+  .dpad .arm{position:absolute;background:var(--cyan-soft);border:1.5px solid rgba(34,211,238,.25);border-radius:14px;
+    transition:background .08s, box-shadow .08s, transform .05s;cursor:pointer;}
+  .dpad .arm:active,.dpad .arm.pressed{background:var(--cyan);box-shadow:0 0 24px var(--cyan),0 0 55px var(--cyan-soft);}
+  .dpad .up{width:58px;height:64px;left:66px;top:0;}
+  .dpad .down{width:58px;height:64px;left:66px;bottom:0;}
+  .dpad .left{width:64px;height:58px;left:0;top:66px;}
+  .dpad .right{width:64px;height:58px;right:0;top:66px;}
+  .dpad .center{position:absolute;width:58px;height:58px;left:66px;top:66px;background:rgba(255,255,255,.05);border-radius:12px;}
+  /* -------- start/select (top center) -------- */
+  .mid{padding:0 8px;}
+  .pill-btn{width:88px;height:26px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);
+    color:var(--muted);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-family:inherit;cursor:pointer;transition:all .08s;}
+  .pill-btn:active,.pill-btn.pressed{background:#fff;color:#111;transform:translateY(1px);}
+  /* -------- shoulders -------- */
+  .shoulders{display:flex;justify-content:space-between;width:100%;max-width:760px;margin-top:8px;}
+  .shoulder{width:86px;height:30px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);
+    color:var(--muted);font-size:12px;letter-spacing:1px;font-family:inherit;cursor:pointer;transition:all .08s;}
+  .shoulder:active,.shoulder.pressed{background:var(--amber);color:#111;box-shadow:0 0 18px var(--amber);}
+  .hint{color:var(--muted);font-size:11px;margin-top:10px;text-align:center;max-width:760px;line-height:1.6;}
+  .hint b{color:var(--ink);}
+  .status{display:flex;gap:8px;align-items:center;}
+  .sel{background:var(--panel);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--ink);padding:6px 10px;font-family:inherit;font-size:12px;}
+  .log{max-width:760px;width:100%;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.05);border-radius:10px;
+    margin-top:10px;padding:8px 12px;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--muted);height:74px;overflow-y:auto;}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="pill"><span class="dot" id="dot"></span><span id="statusTxt">SIMULATOR · OFFLINE</span></div>
+    <div class="status">
+      <span class="pill">PING <span class="lat" id="ping">—</span> ms</span>
+      <select class="sel" id="player"><option value="1">P1</option><option value="2">P2</option></select>
+      <button class="sel" id="connectBtn">CONNECT WS</button>
+    </div>
+  </div>
+
+  <div class="shoulders">
+    <button class="shoulder" data-btn="l">L</button>
+    <div class="pill-btn" data-btn="select">Select</div>
+    <div class="pill-btn" data-btn="start">Start</div>
+    <button class="shoulder" data-btn="r">R</button>
+  </div>
+
+  <div class="row">
+    <div class="dpad">
+      <div class="arm up" data-btn="dpad_up"></div>
+      <div class="arm down" data-btn="dpad_down"></div>
+      <div class="arm left" data-btn="dpad_left"></div>
+      <div class="arm right" data-btn="dpad_right"></div>
+      <div class="center"></div>
+    </div>
+    <div class="face" style="margin-top:30px;">
+      <button class="btnX" data-btn="x">X</button>
+      <button class="btnY" data-btn="y">Y</button>
+      <button class="btnB" data-btn="b">B</button>
+      <button class="btnA" data-btn="a">A</button>
+    </div>
+  </div>
+
+  <div class="hint">
+    Click / tap the buttons — each press sends an <b>input</b> message. This is a faithful
+    rendering of the controller UI design brief (near-black bg, electric-purple face, cyan d-pad,
+    soft glow, latency pill). <b>CONNECT WS</b> links it to the live Node protocol server on
+    <b>ws://127.0.0.1:8877</b> and shows real latency + the exact JSON wire traffic below.
+  </div>
+  <div class="log" id="log">— offline: run <b>cd tools && npm start</b> then CONNECT WS to see live round-trips —</div>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const log = $('#log');
+  let ws = null, connected = false;
+
+  function l(txt){ log.innerHTML = '<div>' + txt + '</div>' + log.innerHTML; if(log.children.length>20) log.removeChild(log.lastChild); }
+
+  const NOTES = {
+    a:'A(face,right)', b:'B', x:'X', y:'Y',
+    dpad_up:'UP', dpad_down:'DOWN', dpad_left:'LEFT', dpad_right:'RIGHT',
+    start:'START', select:'SELECT', l:'L', r:'R'
+  };
+
+  function send(btn, state){
+    if(!ws || ws.readyState!==1){ // still let the sim glow offline
+      l('<span style="color:#FFC23B">offline — no ws</span> · <b>'+btn+'</b>:'+state);
+      return;
+    }
+    const msg = { type:'input', player: +$('#player').value, button: btn, state };
+    ws.send(JSON.stringify(msg));
+    l('→ <b>'+btn+'</b>:'+state+' <span style="color:#888">'+JSON.stringify(msg)+'</span>');
+  }
+
+  function bind(el){
+    const btn = el.dataset.btn;
+    const down = e => { e.preventDefault(); el.classList.add('pressed'); send(btn,'down'); };
+    const up = e => { el.classList.remove('pressed'); send(btn,'up'); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointerleave', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('contextmenu', e=>e.preventDefault());
+  }
+  document.querySelectorAll('[data-btn]').forEach(bind);
+
+  // keyboard for desktop testing
+  const KMAP = {ArrowUp:'dpad_up',ArrowDown:'dpad_down',ArrowLeft:'dpad_left',ArrowRight:'dpad_right',w:'dpad_up',s:'dpad_down',a:'dpad_left',d:'dpad_right',j:'a',k:'b',u:'x',i:'y',Enter:'start',Shift:'select'};
+  window.addEventListener('keydown',e=>{const b=KMAP[e.key]; if(b){e.preventDefault(); const el=document.querySelector(`[data-btn="${b}"]`); el&&el.classList.add('pressed'); send(b,'down');}});
+  window.addEventListener('keyup',e=>{const b=KMAP[e.key]; if(b){e.preventDefault(); const el=document.querySelector(`[data-btn="${b}"]`); el&&el.classList.remove('pressed'); send(b,'up');}});
+
+  // WebSocket connect + ping
+  $('#connectBtn').addEventListener('click', ()=>{
+    if(connected){ ws.close(); return; }
+    const url = 'ws://' + (location.hostname||'127.0.0.1') + ':8877';
+    const dio = $('#dot'), stt = $('#statusTxt');
+    dio.className='dot connecting'; stt.textContent='CONNECTING…';
+    try{ ws = new WebSocket(url); }catch(err){ l('<span style="color:#FF3B6B">'+err.message+'</span>'); return; }
+    ws.onopen = ()=>{ connected=true; dio.className='dot connected'; stt.textContent='CONNECTED · ws://…:8877'; $('#connectBtn').textContent='DISCONNECT';
+      ws.send(JSON.stringify({type:'hello',device:'BrowserSim',role:'controller',player:+$('#player').value}));
+      l('<span style="color:#3BFFB8">✔ connected · hello sent</span>');
+      setInterval(()=>{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'ping',ts:Date.now()})); },1000);
+    };
+    ws.onmessage = ev=>{
+      let m; try{ m=JSON.parse(ev.data);}catch(e){return;}
+      if(m.type==='pong'){ $('#ping').textContent = Date.now()-m.ts; }
+      else if(m.type==='hello_ack'){ l('<span style="color:#3BFFB8">▶ '+m.name+'</span> cores: '+m.cores.join(',')); }
+      else if(m.type==='error'){ l('<span style="color:#FF3B6B">⚠ '+m.code+': '+m.message+'</span>'); }
+      else { l('◀ '+JSON.stringify(m)); }
+    };
+    ws.onclose = ()=>{ connected=false; dio.className='dot'; stt.textContent='DISCONNECTED'; $('#connectBtn').textContent='CONNECT WS'; l('<span style="color:#888">closed</span>'); $('#ping').textContent='—'; };
+    ws.onerror = ()=>{ l('<span style="color:#FF3B6B">ws error</span>'); };
+  });
+})();
+</script>
+</body>
+</html>

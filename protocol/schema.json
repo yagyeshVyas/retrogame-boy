@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://retrolan.local/protocol/schema.json",
+  "title": "RetroLAN Wire Protocol v1",
+  "description": "JSON messages exchanged over WebSocket between the TV host and controller app. Minimal, change-only, LAN-only.",
+  "definitions": {
+    "button": {
+      "type": "string",
+      "enum": ["dpad_up","dpad_down","dpad_left","dpad_right","a","b","x","y","start","select","l","r"]
+    },
+    "player": { "type": "integer", "minimum": 1, "maximum": 2 }
+  },
+  "oneOf": [
+    {
+      "title": "hello",
+      "type": "object",
+      "required": ["type","device","role","player"],
+      "properties": {
+        "type": { "const": "hello" },
+        "device": { "type": "string" },
+        "role": { "const": "controller" },
+        "player": { "$ref": "#/definitions/player" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "hello_ack",
+      "type": "object",
+      "required": ["type","name","cores"],
+      "properties": {
+        "type": { "const": "hello_ack" },
+        "name": { "type": "string" },
+        "cores": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "input",
+      "type": "object",
+      "required": ["type","player","button","state"],
+      "properties": {
+        "type": { "const": "input" },
+        "player": { "$ref": "#/definitions/player" },
+        "button": { "$ref": "#/definitions/button" },
+        "state": { "enum": ["down","up"] }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "ping",
+      "type": "object",
+      "required": ["type","ts"],
+      "properties": { "type": { "const": "ping" }, "ts": { "type": "integer" } },
+      "additionalProperties": false
+    },
+    {
+      "title": "pong",
+      "type": "object",
+      "required": ["type","ts"],
+      "properties": { "type": { "const": "pong" }, "ts": { "type": "integer" } },
+      "additionalProperties": false
+    },
+    {
+      "title": "state",
+      "type": "object",
+      "required": ["type","status","paused","fps"],
+      "properties": {
+        "type": { "const": "state" },
+        "status": { "enum": ["idle","loading","running","paused"] },
+        "rom": { "type": "string" },
+        "paused": { "type": "boolean" },
+        "fps": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "error",
+      "type": "object",
+      "required": ["type","code","message"],
+      "properties": {
+        "type": { "const": "error" },
+        "code": { "enum": ["invalid_button","malformed","unknown_player","internal"] },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

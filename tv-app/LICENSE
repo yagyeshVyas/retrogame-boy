@@ -1,0 +1,23 @@
+GNU GENERAL PUBLIC LICENSE v3.0
+=============================
+
+The Android TV host application under /tv-app is licensed under the GNU General
+Public License version 3 (GPLv3).
+
+This is because /tv-app statically links GPL-licensed libretro emulator cores
+(fceumm, snes9x, gambatte, ...). Distributing a work that links GPL code obliges
+the distributor to offer the combined work under a GPL-compatible license.
+
+The full text of the GNU GPL v3.0 is available at:
+    https://www.gnu.org/licenses/gpl-3.0.txt
+
+You should have received a copy of the GNU General Public License along with
+this program (see COPYING.GPLv3). If not, see <https://www.gnu.org/licenses/>.
+
+THIS PROGRAM IS DISTRIBUTED IN THE HOPE THAT IT WILL BE USEFUL, BUT WITHOUT ANY
+WARRANTY; WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+NOTE: The ROM files themselves are never distributed. This program is a ROM
+*player* only — it loads user-owned local ROM files that the user already has
+on their own device. No copyrighted game ROMs are bundled, downloaded, or linked.

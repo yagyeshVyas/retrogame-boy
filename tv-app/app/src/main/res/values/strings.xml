@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">RetroLAN</string>
+    <string name="select_rom">Select ROM</string>
+    <string name="no_rom_folder">No ROM folder selected</string>
+    <string name="pick_folder">Pick ROM folder</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="save_state">Save State</string>
+    <string name="load_state">Load State</string>
+</resources>

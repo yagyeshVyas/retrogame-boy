@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@color/bg" android:padding="24dp">
+    <TextView
+        android:id="@+id/title"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="RetroLAN"
+        android:textSize="30sp" android:textColor="@color/ink" android:textStyle="bold" />
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="@string/no_rom_folder" android:textColor="@color/muted" android:textSize="14sp" android:layout_marginTop="4dp" />
+    <Button
+        android:id="@+id/pick_folder"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="@string/pick_folder" android:layout_marginTop="16dp" android:layout_marginBottom="16dp" />
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rom_grid"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+</LinearLayout>

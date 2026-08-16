@@ -1,0 +1,25 @@
+name: retrolan_controller
+description: RetroLAN — a phone that becomes a wireless gamepad for your LAN-only retro console.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # WebSocket client
+  web_socket_channel: ^3.0.3
+  # mDNS / DNS-SD discovery
+  multicast_dns: ^0.3.3+1
+  # haptic feedback is in services (no package needed)
+  cupertino_icons: ^1.0.9
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

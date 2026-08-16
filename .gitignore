@@ -1,0 +1,55 @@
+# Android / Gradle
+tv-app/.gradle/
+tv-app/build/
+tv-app/**/build/
+tv-app/local.properties
+*.apk
+*.aab
+
+# Flutter / Dart
+controller-app/.dart_tool/
+controller-app/.flutter-plugins*
+controller-app/build/
+controller-app/.packages
+controller-app/.pub-cache/
+*.iml
+
+# iOS
+controller-app/ios/Pods/
+controller-app/ios/.symlinks/
+*.ipa
+
+# Node (tools)
+tools/node_modules/
+tools/package-lock.json
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# NEVER commit ROMs
+*.nes
+*.snes
+*.smc
+*.gb
+*.gbc
+*.gba
+*.gen
+*.md
+*.n64
+*.z64
+*.v64
+*.iso
+*.cue
+*.chd
+*.zip
+
+# keep local ROMs out of git too (user-owned files)
+user-roms/
+
+# Local build artifacts (APKs) — keep built binaries out of git
+# (dist/ios/*.md and *.sh docs ARE tracked)
+dist/*.apk
+dist/*.aab

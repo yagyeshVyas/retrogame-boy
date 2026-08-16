@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:background="@color/card"
+    android:layout_margin="8dp" android:padding="16dp"
+    android:focusable="true" android:clickable="true">
+    <TextView
+        android:id="@+id/rom_title"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/ink" android:textSize="16sp" android:maxLines="2" android:ellipsize="end" />
+</LinearLayout>
