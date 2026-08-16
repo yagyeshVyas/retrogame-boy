@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "com.retrolan.console"
         minSdk = 21          // Android 5.0+ — NDK minimum; covers all Android TV/Google TV/ONN devices
-        targetSdk = 32       // broad sideload compatibility (SAF picker works on all versions)
+        targetSdk = 34       // Android 14 — satisfies lint & runs on all current TV devices
         versionCode = 1
         versionName = "1.0.0"
 
