@@ -37,7 +37,6 @@ Thumbs.db
 *.gbc
 *.gba
 *.gen
-*.md
 *.n64
 *.z64
 *.v64
@@ -53,3 +52,6 @@ user-roms/
 # (dist/ios/*.md and *.sh docs ARE tracked)
 dist/*.apk
 dist/*.aab
+# local build env (machine-specific paths)
+env.sh
+release-assets/

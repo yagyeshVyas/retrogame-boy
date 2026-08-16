@@ -72,7 +72,7 @@ class Connection extends ChangeNotifier {
     } catch (_) {/* ignore malformed */}
   }
 
-  void _sendPing(_) {
+  void _sendPing(Timer t) {
     if (state == ConnState.connected) {
       _channel?.sink.add(jsonEncode(PingMessage(DateTime.now().millisecondsSinceEpoch).toJson()));
     }

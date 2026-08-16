@@ -102,7 +102,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF17171F),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(.07)),
+        border: Border.all(color: Colors.white.withValues(alpha: .07)),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 9, color: color),
@@ -120,8 +120,8 @@ class _GamepadScreenState extends State<GamepadScreen> {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withOpacity(.2)),
-          color: Colors.white.withOpacity(.07),
+          border: Border.all(color: Colors.white.withValues(alpha: .2)),
+          color: Colors.white.withValues(alpha: .07),
         ),
         child: Text(label, style: const TextStyle(color: kMuted, fontSize: 9, letterSpacing: 1.5)),
       ),
@@ -135,8 +135,8 @@ class _GamepadScreenState extends State<GamepadScreen> {
         width: 84, height: 30, alignment: Alignment.center,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(.14)),
-          color: Colors.white.withOpacity(.05),
+          border: Border.all(color: Colors.white.withValues(alpha: .14)),
+          color: Colors.white.withValues(alpha: .05),
         ),
         child: Text(label, style: const TextStyle(color: kMuted, fontSize: 12)),
       ),
@@ -152,7 +152,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
         _dpadArm('dpad_down', 66, 190 - 62, 58, 62),
         _dpadArm('dpad_left', 0, 66, 62, 58),
         _dpadArm('dpad_right',190 - 62, 66, 62, 58),
-        Center(child: Container(width: 56, height: 56, decoration: BoxDecoration(color: Colors.white.withOpacity(.05), borderRadius: BorderRadius.circular(12)))),
+        Center(child: Container(width: 56, height: 56, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .05), borderRadius: BorderRadius.circular(12)))),
       ]),
     );
   }
@@ -228,12 +228,12 @@ class _GlowButtonState extends State<_GlowButton> {
         decoration: BoxDecoration(
           shape: widget.circle ? BoxShape.circle : BoxShape.rectangle,
           borderRadius: widget.circle ? null : BorderRadius.circular(widget.radius),
-          color: widget.color.withOpacity(active ? 1.0 : dim),
-          border: Border.all(color: Colors.white.withOpacity(.16)),
+          color: widget.color.withValues(alpha: active ? 1.0 : dim),
+          border: Border.all(color: Colors.white.withValues(alpha: .16)),
           boxShadow: active
               ? [
-                  BoxShadow(color: widget.color.withOpacity(.6), blurRadius: 26, spreadRadius: 4),
-                  BoxShadow(color: widget.color.withOpacity(.25), blurRadius: 60, spreadRadius: 12),
+                  BoxShadow(color: widget.color.withValues(alpha: .6), blurRadius: 26, spreadRadius: 4),
+                  BoxShadow(color: widget.color.withValues(alpha: .25), blurRadius: 60, spreadRadius: 12),
                 ]
               : const [],
         ),

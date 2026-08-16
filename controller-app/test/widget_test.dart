@@ -3,12 +3,12 @@ import 'package:retrolan_controller/protocol/protocol.dart';
 
 void main() {
   test('protocol input message serializes correctly', () {
-    final m = InputMessage(player: 1, button: 'a', state: 'down');
+    const m = InputMessage(player: 1, button: 'a', state: 'down');
     expect(m.toJson(), {'type': 'input', 'player': 1, 'button': 'a', 'state': 'down'});
   });
 
   test('hello message serializes with player', () {
-    final m = HelloMessage(device: 'Test', player: 2);
+    const m = HelloMessage(device: 'Test', player: 2);
     expect(m.toJson()['player'], 2);
     expect(m.toJson()['role'], 'controller');
   });
