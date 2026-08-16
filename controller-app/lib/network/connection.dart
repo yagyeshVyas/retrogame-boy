@@ -4,10 +4,14 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../protocol/protocol.dart';
 
 enum ConnState { disconnected, connecting, connected, reconnecting }
+
+/// MethodChannel to the native ControllerService (keeps the app alive while playing).
+const MethodChannel _serviceChannel = MethodChannel('retrolan/service');
 
 class Connection extends ChangeNotifier {
   ConnState state = ConnState.disconnected;
@@ -152,7 +156,17 @@ class Connection extends ChangeNotifier {
     _reconnect = Timer(delay, connect);
   }
 
-  void _set(ConnState s) { state = s; notifyListeners(); }
+  void _set(ConnState s) {
+    final prev = state;
+    state = s;
+    if (s == ConnState.connected && prev != ConnState.connected) {
+      // Connected: keep the app alive in the background (foreground service).
+      try { _serviceChannel.invokeMethod('startService'); } catch (_) {}
+    } else if (s != ConnState.connected && prev == ConnState.connected) {
+      try { _serviceChannel.invokeMethod('stopService'); } catch (_) {}
+    }
+    notifyListeners();
+  }
 
   @override
   void dispose() {
