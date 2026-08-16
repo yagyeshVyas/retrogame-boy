@@ -105,6 +105,41 @@ class _GamepadScreenState extends State<GamepadScreen> {
                       ]),
                     ),
                   ),
+                  // Back (exit game -> library) and Close (stop game) controls
+                  GestureDetector(
+                    onTap: () { _conn.control('back'); HapticFeedback.lightImpact(); },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF17171F),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.white.withOpacity(.14)),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                        Icon(Icons.arrow_back, size: 14, color: kAmber),
+                        SizedBox(width: 6),
+                        Text('Back', style: TextStyle(color: kInk, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () { _conn.control('close'); HapticFeedback.lightImpact(); },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF241418),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.redAccent.withOpacity(.35)),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                        Icon(Icons.close, size: 14, color: Colors.redAccent),
+                        SizedBox(width: 6),
+                        Text('Close', style: TextStyle(color: kInk, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ),
                 ],
                 _pill(icon: Icons.bolt, color: kCyan, text: '${_conn.latencyMs} ms'),
               ]),

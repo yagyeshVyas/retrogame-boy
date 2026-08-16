@@ -29,6 +29,10 @@ object RetroServer {
     private val controllers = mutableSetOf<WebSocketSession>()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // The emulator process (:emulator) connects back here as a relay client; every
+    // controller input is forwarded to it so the core (in that process) receives it.
+    @Volatile private var relay: WebSocketSession? = null
+
     // Started/stopped via the running job on the app scope; no typed engine field needed.
     private var state = State.IDLE
     private enum class State { IDLE, RUNNING, STOPPED }
@@ -57,6 +61,7 @@ object RetroServer {
         // Pending ROM upload state (filename -> accumulating bytes)
         var uploadName: String? = null
         val uploadBytes = java.io.ByteArrayOutputStream()
+        var isRelay = false
         try {
             ws.send(jsonString("hello_ack", mapOf("name" to name, "cores" to com.retrolan.console.core.Cores.defaultHelloCores)))
             for (frame in ws.incoming) {
@@ -67,6 +72,12 @@ object RetroServer {
                         try {
                             val obj = Json.parseToJsonElement(text).jsonObject
                             when (obj["type"]?.jsonPrimitive?.content) {
+                                "hello" -> {
+                                    // The emulator process identifies itself as a relay; from
+                                    // then on it receives copies of every controller input.
+                                    val role = obj["role"]?.jsonPrimitive?.content
+                                    if (role == "emulator-relay") { isRelay = true; relay = ws }
+                                }
                                 "rom_upload" -> {
                                     val nm = obj["name"]?.jsonPrimitive?.content
                                     if (!nm.isNullOrEmpty()) { uploadName = nm; uploadBytes.reset() }
@@ -98,7 +109,17 @@ object RetroServer {
             if (uploadName != null && uploadBytes.size() > 0) {
                 saveAndPlay(uploadName!!, uploadBytes.toByteArray(), ws)
             }
+            if (isRelay && relay == ws) relay = null
             controllers.remove(ws)
+            // A controller left mid-press — release its buttons so the game doesn't
+            // think a button is held forever (fixes "auto-jump" after disconnect).
+            if (!isRelay) {
+                relay?.let { r ->
+                    if (r.isActive) {
+                        try { r.send("""{"type":"control","action":"release_all"}""") } catch (_: Exception) {}
+                    }
+                }
+            }
             onControllerCount?.invoke(controllers.size)
         }
     }
@@ -134,6 +155,23 @@ object RetroServer {
                     return
                 }
                 LibRetro.press(button, down, player)
+                // Forward to the emulator process relay (the core lives there now).
+                relay?.let { r ->
+                    if (r != ws && r.isActive) {
+                        try { r.send(text) } catch (_: Exception) {}
+                    }
+                }
+            }
+            "control" -> {
+                // Back / close-game commands from the controller, forwarded to the
+                // emulator process (which finishes the game activity).
+                val action = obj["action"]?.jsonPrimitive?.content ?: return
+                relay?.let { r ->
+                    if (r.isActive) {
+                        try { r.send(text) } catch (_: Exception) {}
+                    }
+                }
+                if (action == "close") LibRetro.clearButtons()
             }
             "ping" -> {
                 val ts = obj["ts"]?.jsonPrimitive?.longOrNull ?: System.currentTimeMillis()

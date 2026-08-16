@@ -46,6 +46,7 @@
             android:name=".ui.GameActivity"
             android:exported="false"
             android:launchMode="singleTask"
+            android:process=":emulator"
             android:configChanges="orientation|keyboardHidden|screenSize|uiMode" />
     </application>
 </manifest>

@@ -77,6 +77,10 @@ dependencies {
     implementation("io.ktor:ktor-server-netty-jvm:2.3.10")
     implementation("io.ktor:ktor-server-websockets-jvm:2.3.10")
     implementation("io.ktor:ktor-network:2.3.10")
+    // Ktor WebSocket client (emulator process relays controller input over localhost)
+    implementation("io.ktor:ktor-client-core-jvm:2.3.10")
+    implementation("io.ktor:ktor-client-cio-jvm:2.3.10")
+    implementation("io.ktor:ktor-client-websockets-jvm:2.3.10")
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     // Coroutines

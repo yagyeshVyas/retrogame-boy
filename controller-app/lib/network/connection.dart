@@ -84,6 +84,12 @@ class Connection extends ChangeNotifier {
     _channel?.sink.add(jsonEncode(InputMessage(player: player, button: button, state: down).toJson()));
   }
 
+  /// Send a control command to the TV: 'back' (exit game) or 'close' (stop + exit).
+  void control(String action) {
+    if (state != ConnState.connected) return;
+    _channel?.sink.add(jsonEncode({'type': 'control', 'action': action}));
+  }
+
   /// Send a ROM file (your own local file) to the TV over Wi-Fi so the TV plays it.
   /// Header -> binary bytes -> end marker. Returns true if the transfer was sent.
   bool sendRom(String fileName, List<int> bytes) {

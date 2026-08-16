@@ -12,6 +12,20 @@ import androidx.appcompat.app.AppCompatActivity
 import com.retrolan.console.R
 import com.retrolan.console.core.LibRetro
 import com.retrolan.console.network.RetroServer
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.webSocket
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readText
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.io.FileOutputStream
 
@@ -51,6 +65,10 @@ class GameActivity : AppCompatActivity() {
         // Give LibRetro a cache dir so .zip ROMs can be extracted before loading.
         LibRetro.cacheDir = cacheDir
         LibRetro.surfaceHolder = holder
+        // This activity runs in the :emulator process — LibRetro's statics live HERE,
+        // so the core library dir must be set in this process too (MainActivity's set
+        // belongs to the main process and is not visible here).
+        LibRetro.coreLibraryDir = File(applicationInfo.nativeLibraryDir)
         holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(h: SurfaceHolder) {
                 LibRetro.surfaceHolder = h
@@ -67,9 +85,55 @@ class GameActivity : AppCompatActivity() {
             override fun surfaceDestroyed(h: SurfaceHolder) { LibRetro.stop() }
         })
 
-        RetroServer.onControllerCount = { n -> runOnUiThread {
-            Toast.makeText(this, "$n controller(s)", Toast.LENGTH_SHORT).show()
-        } }
+        // This activity runs in the :emulator process. The controller inputs arrive at the
+        // main process's WebSocket server; connect back to it as a relay so those inputs
+        // reach the core living in THIS process.
+        startRelayClient()
+    }
+
+    /** Connect to the main-process WS server (localhost:8877) as the input relay. */
+    private fun startRelayClient() {
+        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        scope.launch {
+            var attempt = 0
+            while (true) {
+                try {
+                    val client = HttpClient(CIO) { install(WebSockets) }
+                    client.webSocket("ws://127.0.0.1:8877") {
+                        send(Frame.Text(
+                            """{"type":"hello","device":"emulator","role":"emulator-relay"}"""))
+                        for (frame in incoming) {
+                            if (frame is Frame.Text) {
+                                val text = frame.readText()
+                                val obj = try {
+                                    Json.parseToJsonElement(text).jsonObject
+                                } catch (_: Exception) { null } ?: continue
+                                when (obj["type"]?.jsonPrimitive?.content) {
+                                    "input" -> {
+                                        val player = (obj["player"]?.jsonPrimitive?.int ?: 1).coerceIn(1, 2)
+                                        val button = obj["button"]?.jsonPrimitive?.content ?: continue
+                                        val down = obj["state"]?.jsonPrimitive?.content == "down"
+                                        LibRetro.press(button, down, player)
+                                    }
+                                    "control" -> {
+                                        val action = obj["action"]?.jsonPrimitive?.content ?: continue
+                                        when (action) {
+                                            "release_all" -> LibRetro.clearButtons()
+                                            "back", "close" -> runOnUiThread { finish() }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    client.close()
+                } catch (_: Exception) {
+                    // server not up yet — retry with backoff
+                }
+                attempt++
+                Thread.sleep((500L * attempt).coerceAtMost(5000L))
+            }
+        }
     }
 
     private fun copyToCache(uriString: String?, dest: File) {

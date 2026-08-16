@@ -32,6 +32,9 @@ object LibRetro {
     private external fun nativeFrameHeight(): Int
     private external fun nativeFramePitch(): Int
     private external fun nativeFrameFormat(): Int
+    private external fun nativeDrainAudio(out: ByteArray): Int
+    private external fun nativeAudioRate(): Int
+    private external fun nativeClearButtons()
 
     @Volatile var running = false
         private set
@@ -134,6 +137,9 @@ object LibRetro {
         nativeSetButton(player - 1, id, down) // protocol is 1-based player
     }
 
+    /** Release every held button (call on disconnect / fresh game load). */
+    fun clearButtons() { nativeClearButtons() }
+
     /** Surface the rendered game frames are drawn to (set by GameActivity). */
     @Volatile var surfaceHolder: android.view.SurfaceHolder? = null
 
@@ -144,6 +150,23 @@ object LibRetro {
         emuThread = thread(name = "retro-run") {
             val frameMs = 16L // ~60fps
             var bitmap: android.graphics.Bitmap? = null
+            // Audio output: 16-bit stereo PCM at the core's sample rate.
+            var audioTrack: android.media.AudioTrack? = null
+            val audioBuf = ByteArray(64 * 1024)
+            try {
+                val rate = nativeAudioRate()
+                audioTrack = android.media.AudioTrack(
+                    android.media.AudioManager.STREAM_MUSIC, rate,
+                    android.media.AudioFormat.CHANNEL_OUT_STEREO,
+                    android.media.AudioFormat.ENCODING_PCM_16BIT,
+                    android.media.AudioTrack.getMinBufferSize(
+                        rate, android.media.AudioFormat.CHANNEL_OUT_STEREO,
+                        android.media.AudioFormat.ENCODING_PCM_16BIT) * 2,
+                    android.media.AudioTrack.MODE_STREAM)
+                audioTrack?.play()
+            } catch (e: Exception) {
+                Log.w(TAG, "audio init failed: ${e.message}")
+            }
             while (running) {
                 val t0 = System.nanoTime()
                 nativeRunFrame()
@@ -165,10 +188,16 @@ object LibRetro {
                         drawFrame(bitmap)
                     }
                 }
+                // Drain audio to the speaker.
+                try {
+                    val n = nativeDrainAudio(audioBuf)
+                    if (n > 0) audioTrack?.write(audioBuf, 0, n)
+                } catch (_: Exception) {}
                 val elapsed = (System.nanoTime() - t0) / 1_000_000
                 val sleep = (frameMs - elapsed).coerceAtLeast(1)
                 try { Thread.sleep(sleep) } catch (_: InterruptedException) { break }
             }
+            try { audioTrack?.stop(); audioTrack?.release() } catch (_: Exception) {}
         }
     }
 

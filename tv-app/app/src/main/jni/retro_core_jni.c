@@ -52,6 +52,18 @@ static size_t frame_pitch = 0;
 static int frame_format = -1;   /* RETRO_PIXEL_FORMAT_* the core picked */
 static int frame_ready = 0;
 
+/* ---- audio ring buffer (written by core_audio_*, drained via JNI) ---- */
+#define AUDIO_CAP (1024 * 1024)   /* ~1.2s of stereo 44.1kHz 16-bit */
+static unsigned char audio_buf[AUDIO_CAP];
+static size_t audio_len = 0;
+
+static void audio_append(const unsigned char *p, size_t n) {
+    size_t space = AUDIO_CAP - audio_len;
+    if (n > space) n = space;   /* drop oldest-ish (simplest); keeps latency low */
+    memcpy(audio_buf + audio_len, p, n);
+    audio_len += n;
+}
+
 /* ---- the environment callback the core calls back into ---- */
 static bool core_environment(unsigned cmd, void *data) {
     switch (cmd) {
@@ -104,11 +116,13 @@ static void core_video_refresh(const void *data, unsigned width, unsigned height
 }
 
 static void core_audio_sample(int16_t left, int16_t right) {
-    (void)left; (void)right;
+    int16_t stereo[2] = { left, right };
+    audio_append((const unsigned char *)stereo, sizeof(stereo));
 }
 
 static size_t core_audio_sample_batch(const int16_t *data, size_t frames) {
-    (void)data; return frames;
+    audio_append((const unsigned char *)data, frames * 2 * sizeof(int16_t));
+    return frames;
 }
 
 static void core_input_poll(void) { /* state fed lazily via JNI */ }
@@ -238,6 +252,27 @@ Java_com_retrolan_console_core_LibRetro_nativeFrameFormat(JNIEnv *env, jobject t
     (void)env; (void)thiz; return frame_format;
 }
 
+/* ---- drain pending audio samples into a Java byte[] (interleaved 16-bit stereo) ---- */
+JNIEXPORT jint JNICALL
+Java_com_retrolan_console_core_LibRetro_nativeDrainAudio(JNIEnv *env, jobject thiz,
+    jbyteArray out) {
+    if (audio_len == 0) return 0;
+    jsize want = (*env)->GetArrayLength(env, out);
+    size_t n = audio_len < (size_t)want ? audio_len : (size_t)want;
+    (*env)->SetByteArrayRegion(env, out, 0, (jsize)n, (const jbyte *)audio_buf);
+    /* shift remaining bytes down (simple; fine at these sizes) */
+    if (n < audio_len) memmove(audio_buf, audio_buf + n, audio_len - n);
+    audio_len -= n;
+    return (jint)n;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_retrolan_console_core_LibRetro_nativeAudioRate(JNIEnv *env, jobject thiz) {
+    (void)env; (void)thiz;
+    /* fceumm & most cores run at 44100 Hz; cores can override via retro_get_system_av_info. */
+    return 44100;
+}
+
 /* ---- reset the core ---- */
 JNIEXPORT void JNICALL
 Java_com_retrolan_console_core_LibRetro_nativeReset(JNIEnv *env, jobject thiz) {
@@ -266,4 +301,11 @@ Java_com_retrolan_console_core_LibRetro_nativeSetButton(JNIEnv *env, jobject thi
     if (libretro_id < 0 || libretro_id >= 16) return;
     if (down) retro_state[player][libretro_id] = 1;
     else      retro_state[player][libretro_id] = 0;
+}
+
+/* ---- clear ALL held buttons (called on controller disconnect / game start) ---- */
+JNIEXPORT void JNICALL
+Java_com_retrolan_console_core_LibRetro_nativeClearButtons(JNIEnv *env, jobject thiz) {
+    (void)env; (void)thiz;
+    memset(retro_state, 0, sizeof(retro_state));
 }
