@@ -184,6 +184,9 @@ object LibRetro {
         emuThread = thread(name = "retro-run") {
             val frameMs = 16L // ~60fps target; loop adapts if the device is slow
             var bitmap: android.graphics.Bitmap? = null
+            // Nearest-neighbor paint: crisp NES pixels AND much cheaper than bilinear.
+            val paint = android.graphics.Paint().apply { isFilterBitmap = false }
+            var pinned = false   // surface pinned to game size once (hardware upscale)
             var fpsAccum = 0L
             var fpsT0 = System.nanoTime()
             // Reused per-frame buffers (avoid GC pressure / allocation churn -> fps)
@@ -213,9 +216,21 @@ object LibRetro {
                             }
                             frameBB!!.rewind() // copyPixelsFromBuffer consumes the buffer
                             bitmap?.copyPixelsFromBuffer(frameBB!!)
-                            // Draw the FRESH frame every time (a cached scaled bitmap would
-                            // freeze the picture on frame 1 — never cache the render target).
-                            drawFrame(bitmap)
+                            // Pin the surface buffer to the integer-scaled game size ONCE:
+                            // the TV's compositor (hardware) upscales to full screen for
+                            // free, and the CPU only does a small nearest-neighbor blit.
+                            val sh = surfaceHolder
+                            if (!pinned && sh != null) {
+                                try {
+                                    val sw = sh.surfaceFrame.width()
+                                    val shh = sh.surfaceFrame.height()
+                                    val s = (minOf(sw.toFloat() / w, shh.toFloat() / h)).toInt()
+                                        .coerceAtLeast(1)
+                                    sh.setFixedSize(w * s, h * s)
+                                    pinned = true
+                                } catch (_: Exception) {}
+                            }
+                            drawFrame(bitmap, paint, pinned)
                         } catch (e: Exception) {
                             // A bad frame must never kill the emulator — log and continue.
                             Log.w(TAG, "frame render skipped: ${e.message}")
@@ -249,23 +264,30 @@ object LibRetro {
     @Volatile private var holderHeight = 0
 
     /** Draw the game frame to the surface, preserving aspect ratio (no stretch). */
-    private fun drawFrame(bmp: android.graphics.Bitmap?) {
+    private fun drawFrame(bmp: android.graphics.Bitmap?, paint: android.graphics.Paint, pinnedSurface: Boolean) {
         val holder = surfaceHolder ?: return
         val b = bmp ?: return
         val canvas = try { holder.lockCanvas() } catch (_: Exception) { return } ?: return
         try {
             holderWidth = canvas.width; holderHeight = canvas.height
             canvas.drawColor(android.graphics.Color.BLACK)
-            val vw = canvas.width.toFloat()
-            val vh = canvas.height.toFloat()
-            val ar = b.width.toFloat() / b.height.toFloat()
-            var dw = vw
-            var dh = vw / ar
-            if (dh > vh) { dh = vh; dw = vh * ar }
-            val left = (vw - dw) / 2f
-            val top = (vh - dh) / 2f
-            canvas.drawBitmap(b, null,
-                android.graphics.RectF(left, top, left + dw, top + dh), null)
+            // Pinned surface: canvas == integer-scaled game size -> draw 1:1 (cheap blit).
+            if (pinnedSurface && canvas.width % b.width == 0 && canvas.height % b.height == 0) {
+                canvas.drawBitmap(b, null,
+                    android.graphics.RectF(0f, 0f,
+                        canvas.width.toFloat(), canvas.height.toFloat()), paint)
+            } else {
+                // Fallback (first frames before pinning): center with aspect ratio kept.
+                val vw = canvas.width.toFloat()
+                val vh = canvas.height.toFloat()
+                val ar = b.width.toFloat() / b.height.toFloat()
+                var dw = vw
+                var dh = vw / ar
+                if (dh > vh) { dh = vh; dw = vh * ar }
+                canvas.drawBitmap(b, null,
+                    android.graphics.RectF((vw - dw) / 2f, (vh - dh) / 2f,
+                        (vw + dw) / 2f, (vh + dh) / 2f), paint)
+            }
         } finally {
             try { holder.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
         }
