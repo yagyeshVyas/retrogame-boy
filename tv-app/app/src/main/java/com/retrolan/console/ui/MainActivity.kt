@@ -82,8 +82,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun isRomExt(name: String): Boolean {
         val e = name.substringAfterLast('.', "").lowercase()
-        // user-owned local ROMs only; NES for the fceumm core in v1
-        return e in setOf("nes", "snes", "smc", "gb", "gbc")
+        // All supported systems' ROM extensions (see core/Cores.kt) — user-owned local files only.
+        return e in com.retrolan.console.core.Cores.allExtensions
     }
 
     override fun onDestroy() {

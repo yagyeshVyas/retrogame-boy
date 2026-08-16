@@ -50,14 +50,13 @@ class GameActivity : AppCompatActivity() {
         val local = File(cacheDir, "current.$romName")
         holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(h: SurfaceHolder) {
-                if (!LibRetro.loadCore("fceumm")) {
-                    Toast.makeText(this@GameActivity, "core fceumm missing", Toast.LENGTH_LONG).show()
-                    return
-                }
                 copyToCache(romUri, local)
-                if (LibRetro.loadGame(local.absolutePath)) {
+                val system = LibRetro.loadGameByPath(local.absolutePath)
+                if (system != null) {
                     LibRetro.start()
-                    Toast.makeText(this@GameActivity, "Playing: local file", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@GameActivity, "Playing: $system (local file)", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this@GameActivity, "No core for that ROM", Toast.LENGTH_LONG).show()
                 }
             }
             override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, hh: Int) {}

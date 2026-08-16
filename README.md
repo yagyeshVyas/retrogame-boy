@@ -78,7 +78,7 @@ Full guide: **[docs/SETUP.md](docs/SETUP.md)** · Build notes: **[docs/BUILDING.
 - **D-pad-navigable 10-foot UI**, correct 4:3 aspect (never stretched), integer-scaling option
 - **Retro-arcade controller** — near-black `#0D0D12`, electric-purple face buttons, cyan D-pad, glow-on-press, haptics, live latency pill, auto-reconnect with backoff
 - **2-player** selector, save states (scaffolding), physical-gamepad passthrough
-- **Cores:** `fceumm` (NES) wired via JNI; `snes9x`, `gambatte` stubbed
+- **Cores:** 23 systems wired in a central catalog (`Cores.kt`) — NES, SNES, GB/GBC, GBA, Genesis/SMS/GG/32X, N64, PSX, PSP, arcade (FBNeo), DS, PCE, NGP, WonderSwan, 3DS, Atari 2600/7800/Lynx. See the table below.
 
 Implementation status of the original build phases:
 1. ✅ NES playback via libretro JNI (proof-of-emulation path)
@@ -89,6 +89,42 @@ Implementation status of the original build phases:
 6. ✅ ROM picker, reconnect, latency ping; 🟡 save states / 2-player / extra cores
 
 ---
+
+
+## 🕹 Supported systems (libretro cores)
+
+The TV host loads cores at runtime by ROM extension — the catalog in
+`tv-app/.../core/Cores.kt`. Cores are **not bundled** (GPL); drop the `.so` files you
+build from the cores' own sources into `jniLibs/<abi>/`. See `docs/SETUP.md`.
+
+| System | Core | ROM extensions |
+|--------|------|----------------|
+| Atari 2600 | `stella` | a26, bin |
+| Atari 7800 | `prosystem` | a78, bin |
+| Atari Lynx | `handy` | lnx |
+| Nintendo (NES) | `fceumm` | nes, fds, unf, unif |
+| Super Nintendo (SNES) | `snes9x` | sfc, smc, fig, swc |
+| Game Boy | `gambatte` | gb, dmg |
+| Game Boy Color | `gambatte` | gbc |
+| Game Boy Advance | `mgba` | gba, agb, mb |
+| Sega Genesis / Megadrive | `genesis_plus_gx` | md, gen, bin, smd |
+| Sega CD / Mega CD | `genesis_plus_gx` | cue, chd |
+| Sega Master System | `genesis_plus_gx` | sms |
+| Sega Game Gear | `genesis_plus_gx` | gg, sg |
+| Nintendo 64 | `mupen64plus` | n64, z64, v64 |
+| PlayStation | `pcsx_rearmed` | cue, chd, pbp, exe |
+| PSP | `ppsspp` | iso, cso, chd, pbp |
+| FinalBurn Neo (Arcade) | `fbneo` | zip, 7z |
+| Nintendo DS | `desmume` | nds |
+| NEC PC Engine | `beetle_pce_fast` | pce, sgx, cue, chd |
+| Neo Geo Pocket | `mednafen_ngp` | ngp |
+| Neo Geo Pocket Color | `mednafen_ngp` | ngc |
+| WonderSwan | `beetle_cygne` | ws, wsc |
+| WonderSwan Color | `beetle_cygne` | wsc |
+| Nintendo 3DS | `citra` | 3ds, 3dsx, cia, cci |
+
+*This is the **TV host** (Kotlin/libretro) catalog. The released controller APKs are the
+Flutter gamepad that drives it over the LAN — they carry no cores by design (MIT).*
 
 ## 🔒 Licensing — read this first
 

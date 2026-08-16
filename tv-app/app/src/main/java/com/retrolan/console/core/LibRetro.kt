@@ -36,6 +36,7 @@ object LibRetro {
     @Volatile var systemDir: File? = null
 
     private var coreName: String? = null
+    private var currentSystem: CoreDef? = null
     private var emuThread: Thread? = null
 
     /** Load a core by short name ("fceumm" -> libretro_fceumm.so in coreLibraryDir). */
@@ -44,10 +45,39 @@ object LibRetro {
         val lib = File(dir, "libretro_$name.so")
         if (!lib.exists()) { Log.e(TAG, "core ${lib.absolutePath} not found"); return false }
         val ok = nativeLoadCore(lib.absolutePath)
-        if (ok) coreName = name
+        if (ok) { coreName = name; currentSystem = null }
         return ok
     }
 
+    /**
+     * Load a ROM file and the correct core for it, chosen from the extension via [Cores].
+     * This is the one-call path that makes the whole supported-systems catalog playable.
+     *
+     * @return the friendly system name on success, or null on failure.
+     */
+    fun loadGameByPath(romPath: String): String? {
+        val ext = romPath.substringAfterLast('.', "").lowercase()
+        val def = Cores.resolve(ext) ?: run {
+            Log.e(TAG, "no core for extension '.$ext' (supported: ${Cores.allExtensions})")
+            return null
+        }
+        val dir = coreLibraryDir ?: return null
+        val lib = File(dir, "libretro_${def.core}.so")
+        if (!lib.exists()) {
+            Log.e(TAG, "core '${def.core}' (${def.system}) not found at ${lib.absolutePath}")
+            return null
+        }
+        val ok = nativeLoadCore(lib.absolutePath)
+        if (!ok) return null
+        coreName = def.core
+        currentSystem = def
+        val loaded = nativeLoadGame(romPath, def.core)
+        if (!loaded) { Log.e(TAG, "load_game failed for $romPath with ${def.core}"); return null }
+        Log.i(TAG, "playing ${def.system} on ${def.core}: $romPath")
+        return def.system
+    }
+
+    /** A ROM's full path (override in tests / no-content builds). */
     fun loadGame(romPath: String): Boolean {
         val cn = coreName ?: return false
         return nativeLoadGame(romPath, cn)

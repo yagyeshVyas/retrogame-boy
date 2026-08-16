@@ -1,7 +1,6 @@
 package com.retrolan.console.network
 
 import com.retrolan.console.core.LibRetro
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -10,7 +9,6 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
-import java.net.InetSocketAddress
 
 /**
  * Embedded WebSocket server (role of the TV host).
@@ -47,7 +45,7 @@ object RetroServer {
         controllers.add(ws)
         onControllerCount?.invoke(controllers.size)
         try {
-            ws.send(jsonString("hello_ack", mapOf("name" to name, "cores" to listOf("fceumm","snes9x","gambatte"))))
+            ws.send(jsonString("hello_ack", mapOf("name" to name, "cores" to com.retrolan.console.core.Cores.defaultHelloCores)))
             for (frame in ws.incoming) {
                 if (frame !is Frame.Text) continue
                 val text = frame.readText()
