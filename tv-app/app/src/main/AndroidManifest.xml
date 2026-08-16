@@ -10,9 +10,15 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
-    <uses-feature android:name="android.software.leanback" android:required="true" />
+    <!-- Features are all OPTIONAL (required=false) so the app installs on every Android
+         TV / Google TV / ONN streaming device. The LEANBACK_LAUNCHER category (below) is what
+         puts it on the TV home screen; none of these hardware/software features is mandatory. -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+    <uses-feature android:name="android.hardware.faketouch" android:required="false" />
+    <uses-feature android:name="android.hardware.screen.landscape" android:required="false" />
 
     <application
         android:label="RetroLAN"
