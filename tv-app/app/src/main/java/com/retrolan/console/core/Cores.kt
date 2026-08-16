@@ -38,7 +38,7 @@ object Cores {
         CoreDef("Nintendo 64 (N64)", "mupen64plus", setOf("n64", "z64", "v64")),
         CoreDef("PlayStation (PSX)", "pcsx_rearmed", setOf("cue", "chd", "pbp", "exe"), players = 2),
         CoreDef("PlayStation Portable (PSP)", "ppsspp", setOf("iso", "cso", "chd", "pbp"), players = 1),
-        CoreDef("FinalBurn Neo (Arcade)", "fbneo", setOf("zipset", "7z"), players = 4),
+        CoreDef("FinalBurn Neo (Arcade)", "fbneo", setOf("zip", "7z"), players = 4),
         CoreDef("Nintendo DS (NDS)", "desmume", setOf("nds"), players = 1),
         CoreDef("NEC PC Engine (PCE)", "beetle_pce_fast", setOf("pce", "sgx", "cue", "chd")),
         CoreDef("Neo Geo Pocket (NGP)", "mednafen_ngp", setOf("ngp")),
