@@ -19,6 +19,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
   late final Connection _conn;
   final Set<String> _held = {}; // dedupe: avoid re-sending down for a held button
   bool _abSwap = false;         // swap A<->B (NES: jump is usually B)
+  ConnState _prevState = ConnState.disconnected;
 
   @override
   void initState() {
@@ -31,22 +32,30 @@ class _GamepadScreenState extends State<GamepadScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
-  /// Connection state changed: when the link drops, release every held button so
-  /// the phone and TV never desync (a held button after reconnect = stuck controls).
+  /// Connection state changed: only act on REAL transitions (connect/disconnect).
+  /// Pongs arrive every second — if we cleared held buttons on every notification,
+  /// any held button would desync (TV keeps the down, phone forgets -> stuck keys).
   void _onConnChanged() {
     if (!mounted) return;
     final st = _conn.state;
-    if (st == ConnState.reconnecting || st == ConnState.disconnected) {
-      if (_held.isNotEmpty) {
-        for (final b in _held.toList()) {
-          _conn.input(b, 'up'); // best-effort release over the dying socket
-        }
-        setState(_held.clear);
+    if (st != _prevState) {
+      if (st == ConnState.reconnecting || st == ConnState.disconnected) {
+        _releaseAll(); // link dropped: tell the TV to release, start clean
+      } else if (st == ConnState.connected) {
+        _releaseAll(); // fresh link: release anything stale from before
       }
-    } else if (st == ConnState.connected) {
-      if (_held.isNotEmpty) setState(_held.clear); // fresh link: start clean
+      _prevState = st;
     }
     setState(() {});
+  }
+
+  /// Send 'up' for every held button and clear the set (phone/TV resync).
+  void _releaseAll() {
+    if (_held.isEmpty) return;
+    for (final b in _held.toList()) {
+      _conn.input(b, 'up'); // best-effort release
+    }
+    setState(_held.clear);
   }
 
   @override
