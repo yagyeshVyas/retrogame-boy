@@ -14,7 +14,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") } // arm64 TVs + x86_64 emulators/TV boxes
+        // ABI selection handled by the splits block below (arm64 + x86_64, per-ABI APKs).
         externalNativeBuild {
             cmake { cFlags += "-std=c11" } // retro_core_jni.c is C
         }
