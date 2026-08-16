@@ -27,6 +27,11 @@ object LibRetro {
     private external fun nativeRunFrame()
     private external fun nativeSetButton(player: Int, libretroId: Int, down: Boolean)
     private external fun nativeLoadGame(romPath: String, coreName: String): Boolean
+    private external fun nativeCopyFrame(out: ByteArray): Int
+    private external fun nativeFrameWidth(): Int
+    private external fun nativeFrameHeight(): Int
+    private external fun nativeFramePitch(): Int
+    private external fun nativeFrameFormat(): Int
 
     @Volatile var running = false
         private set
@@ -129,19 +134,62 @@ object LibRetro {
         nativeSetButton(player - 1, id, down) // protocol is 1-based player
     }
 
+    /** Surface the rendered game frames are drawn to (set by GameActivity). */
+    @Volatile var surfaceHolder: android.view.SurfaceHolder? = null
+
     /** Start the emulation run loop on a dedicated thread (60 fps target). */
     fun start() {
         if (running) return
         running = true
         emuThread = thread(name = "retro-run") {
             val frameMs = 16L // ~60fps
+            var bitmap: android.graphics.Bitmap? = null
             while (running) {
                 val t0 = System.nanoTime()
                 nativeRunFrame()
+                // Render the latest frame to the Surface if we have one.
+                val w = nativeFrameWidth()
+                val h = nativeFrameHeight()
+                val pitch = nativeFramePitch()
+                if (w > 0 && h > 0 && pitch > 0) {
+                    val fmt = nativeFrameFormat()
+                    val buf = ByteArray(h * pitch)
+                    if (nativeCopyFrame(buf) == 1) {
+                        val bmp = bitmap
+                        if (bmp == null || bmp.width != w || bmp.height != h) {
+                            val cfg = if (fmt == 2) android.graphics.Bitmap.Config.RGB_565
+                                      else android.graphics.Bitmap.Config.ARGB_8888
+                            bitmap = android.graphics.Bitmap.createBitmap(w, h, cfg)
+                        }
+                        bitmap?.copyPixelsFromBuffer(java.nio.ByteBuffer.wrap(buf))
+                        drawFrame(bitmap)
+                    }
+                }
                 val elapsed = (System.nanoTime() - t0) / 1_000_000
                 val sleep = (frameMs - elapsed).coerceAtLeast(1)
                 try { Thread.sleep(sleep) } catch (_: InterruptedException) { break }
             }
+        }
+    }
+
+    /** Draw the game frame to the surface, preserving aspect ratio (no stretch). */
+    private fun drawFrame(bmp: android.graphics.Bitmap?) {
+        val holder = surfaceHolder ?: return
+        val b = bmp ?: return
+        val canvas = try { holder.lockCanvas() } catch (_: Exception) { return } ?: return
+        try {
+            canvas.drawColor(android.graphics.Color.BLACK)
+            val vw = canvas.width.toFloat()
+            val vh = canvas.height.toFloat()
+            val ar = b.width.toFloat() / b.height.toFloat()
+            var dw = vw
+            var dh = vw / ar
+            if (dh > vh) { dh = vh; dw = vh * ar }
+            val left = (vw - dw) / 2f
+            val top = (vh - dh) / 2f
+            canvas.drawBitmap(b, null, android.graphics.RectF(left, top, left + dw, top + dh), null)
+        } finally {
+            try { holder.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
         }
     }
 

@@ -44,6 +44,14 @@ static int loaded = 0; /* 1 once retro_load_game succeeded */
 /* ---- current button state (fed from JNI when a WS/controller message arrives) ---- */
 static int16_t retro_state[2][16]; /* bitmask per joypad, 2 players */
 
+/* ---- rendered frame storage (written by core_video_refresh, read via JNI) ---- */
+static unsigned char *frame_buf = NULL;
+static size_t frame_cap = 0;
+static unsigned frame_w = 0, frame_h = 0;
+static size_t frame_pitch = 0;
+static int frame_format = -1;   /* RETRO_PIXEL_FORMAT_* the core picked */
+static int frame_ready = 0;
+
 /* ---- the environment callback the core calls back into ---- */
 static bool core_environment(unsigned cmd, void *data) {
     switch (cmd) {
@@ -70,9 +78,10 @@ static bool core_environment(unsigned cmd, void *data) {
             return true;
         }
         case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: {
-            /* Accept RGB565 or 0RGB1555; cores pick a format via this env call. */
+            /* Cores pick RGB565 or XRGB8888 here; remember it so the renderer knows. */
             const enum retro_pixel_format *fmt = (const enum retro_pixel_format *)data;
-            LOGI("pixel format requested: %d", fmt ? (int)*fmt : -1);
+            if (fmt) frame_format = (int)*fmt;
+            LOGI("pixel format requested: %d", frame_format);
             return true;
         }
         default:
@@ -82,10 +91,16 @@ static bool core_environment(unsigned cmd, void *data) {
 
 /* ---- the video/audio/input callbacks the core calls every frame ---- */
 static void core_video_refresh(const void *data, unsigned width, unsigned height, size_t pitch) {
-    /* RGBA8888 (or RGB565) frame. The Kotlin side registers a callback that uploads to
-       the Surface via a shared bitmap; for v1 the frame is dropped if no surface. */
-    JNIEnv *env = NULL;
-    (void)env; (void)data; (void)width; (void)height; (void)pitch;
+    if (!data || width == 0 || height == 0) { frame_ready = 0; return; }
+    size_t need = (size_t)height * pitch;
+    if (frame_buf == NULL || frame_cap < need) {
+        unsigned char *nb = (unsigned char *)realloc(frame_buf, need);
+        if (!nb) { frame_ready = 0; return; }
+        frame_buf = nb; frame_cap = need;
+    }
+    memcpy(frame_buf, data, need);
+    frame_w = width; frame_h = height; frame_pitch = pitch;
+    frame_ready = 1;
 }
 
 static void core_audio_sample(int16_t left, int16_t right) {
@@ -189,6 +204,38 @@ Java_com_retrolan_console_core_LibRetro_nativeRunFrame(JNIEnv *env, jobject thiz
     (void)env; (void)thiz;
     if (!core_handle || !run_fn || !loaded) return;
     run_fn();
+}
+
+/* ---- copy the last rendered frame into a Java byte[] (RGB565 or XRGB8888) ---- */
+JNIEXPORT jint JNICALL
+Java_com_retrolan_console_core_LibRetro_nativeCopyFrame(JNIEnv *env, jobject thiz,
+    jbyteArray out) {
+    if (!frame_ready || !frame_buf) return 0;
+    jsize want = (*env)->GetArrayLength(env, out);
+    size_t need = (size_t)frame_h * frame_pitch;
+    if ((size_t)want < need) return 0;
+    (*env)->SetByteArrayRegion(env, out, 0, (jsize)need, (const jbyte *)frame_buf);
+    return 1;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_retrolan_console_core_LibRetro_nativeFrameWidth(JNIEnv *env, jobject thiz) {
+    (void)env; (void)thiz; return frame_ready ? (jint)frame_w : 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_retrolan_console_core_LibRetro_nativeFrameHeight(JNIEnv *env, jobject thiz) {
+    (void)env; (void)thiz; return frame_ready ? (jint)frame_h : 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_retrolan_console_core_LibRetro_nativeFramePitch(JNIEnv *env, jobject thiz) {
+    (void)env; (void)thiz; return frame_ready ? (jint)frame_pitch : 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_retrolan_console_core_LibRetro_nativeFrameFormat(JNIEnv *env, jobject thiz) {
+    (void)env; (void)thiz; return frame_format;
 }
 
 /* ---- reset the core ---- */

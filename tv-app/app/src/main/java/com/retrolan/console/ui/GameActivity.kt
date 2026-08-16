@@ -50,8 +50,10 @@ class GameActivity : AppCompatActivity() {
         val local = File(cacheDir, "current.$romName")
         // Give LibRetro a cache dir so .zip ROMs can be extracted before loading.
         LibRetro.cacheDir = cacheDir
+        LibRetro.surfaceHolder = holder
         holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(h: SurfaceHolder) {
+                LibRetro.surfaceHolder = h
                 copyToCache(romUri, local)
                 val system = LibRetro.loadGameByPath(local.absolutePath)
                 if (system != null) {
