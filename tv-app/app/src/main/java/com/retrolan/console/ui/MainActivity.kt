@@ -85,7 +85,9 @@ class MainActivity : AppCompatActivity() {
         // LAN services (WebSocket for the phone controller + mDNS advertise so phones find us).
         RetroServer.romDir = java.io.File(getExternalFilesDir(null), "roms")
         RetroServer.onRomReceived = { name -> runOnUiThread { onReceivedRom(name) } }
-        RetroServer.start()
+        // The WS server runs inside a foreground service so Android cannot kill it
+        // while a game is playing in the :emulator process (controller stays connected).
+        startService(android.content.Intent(this, com.retrolan.console.network.RetroLanService::class.java))
         advertiser = RetroAdvertiser(this).also { it.start() }
         LibRetro.coreLibraryDir = File(applicationInfo.nativeLibraryDir)
     }

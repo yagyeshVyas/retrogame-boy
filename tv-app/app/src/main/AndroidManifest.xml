@@ -9,6 +9,11 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Foreground service keeps the WS server alive while games run (Android would
+         otherwise kill the main process after ~1-2 min in the background). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Features are all OPTIONAL (required=false) so the app installs on every Android
          TV / Google TV / ONN streaming device. The LEANBACK_LAUNCHER category (below) is what
@@ -41,6 +46,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Foreground service (main process): keeps the WS :8877 server alive so the
+             phone controller stays connected even during long gameplay. -->
+        <service
+            android:name=".network.RetroLanService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <activity
             android:name=".ui.GameActivity"

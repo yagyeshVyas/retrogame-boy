@@ -152,7 +152,10 @@ object LibRetro {
         running = true
         // ---- Audio thread: owns the AudioTrack; emulation thread only queues chunks,
         //      so a slow/full audio device can never stall video rendering. ----
+        // Small buffer pool: NO per-frame allocations (GC pauses = video jank on
+        // 32-bit TVs). Chunks are recycled after playback.
         val audioQueue = java.util.concurrent.LinkedBlockingQueue<ByteArray>(16)
+        val audioPool = java.util.concurrent.ConcurrentLinkedQueue<ByteArray>()
         val audioThread = thread(name = "retro-audio") {
             var at: android.media.AudioTrack? = null
             try {
@@ -178,6 +181,7 @@ object LibRetro {
                     val chunk = audioQueue.poll(80, java.util.concurrent.TimeUnit.MILLISECONDS)
                         ?: continue
                     try { at.write(chunk, 0, chunk.size) } catch (_: Exception) { break }
+                    audioPool.offer(chunk) // recycle
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "audio thread init failed: ${e.message}")
@@ -241,10 +245,16 @@ object LibRetro {
                     }
                 }
                 // Queue audio for the audio thread (non-blocking; drop if it falls behind —
-                // keeps sound snappy, never freezes video).
+                // keeps sound snappy, never freezes video). Reuses pooled buffers: the
+                // per-frame allocation was causing GC pauses (= video jank) on 32-bit TVs.
                 try {
                     val n = nativeDrainAudio(audioBuf)
-                    if (n > 0) audioQueue.offer(audioBuf.copyOfRange(0, n))
+                    if (n > 0) {
+                        var chunk = audioPool.poll()
+                        if (chunk == null || chunk.size < n) chunk = ByteArray(n.coerceAtLeast(4096))
+                        System.arraycopy(audioBuf, 0, chunk, 0, n)
+                        if (!audioQueue.offer(chunk)) audioPool.offer(chunk) // full -> drop+recycle
+                    }
                 } catch (_: Exception) {}
                 fpsAccum++
                 val now = System.nanoTime()
