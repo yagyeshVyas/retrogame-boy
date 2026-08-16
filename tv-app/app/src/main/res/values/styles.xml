@@ -1,7 +1,10 @@
 <resources>
-    <style name="AppTheme" parent="Theme.Leanback">
+    <!-- AppCompatActivity requires an AppCompat theme; Theme.AppCompat.NoActionBar always exists.
+         TV look comes from the layout/UI. -->
+    <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@color/bg</item>
         <item name="colorPrimary">@color/accent</item>
-        <item name="android:colorAccent">@color/accent</item>
+        <item name="colorPrimaryDark">@color/bg</item>
+        <item name="colorAccent">@color/accent</item>
     </style>
 </resources>
