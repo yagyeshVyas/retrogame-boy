@@ -90,6 +90,9 @@ object LibRetro {
         }
         val ok = nativeLoadCore(lib.absolutePath)
         if (!ok) return null
+        // Fresh game: release any buttons left held from a previous session/game —
+        // otherwise a stuck key (e.g. left) carries into the new game.
+        nativeClearButtons()
         coreName = def.core
         currentSystem = def
         val loaded = nativeLoadGame(path, def.core)

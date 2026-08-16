@@ -247,10 +247,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
   }
 
   Widget _pillBtn(String label, VoidCallback onDown, VoidCallback onUp) {
-    return GestureDetector(
-      onTapDown: (_) => onDown(),
-      onTapUp: (_) => onUp(),
-      onTapCancel: onUp,
+    final pointers = <int>{};
+    return Listener(
+      onPointerDown: (e) { pointers.add(e.pointer); onDown(); },
+      onPointerUp: (e) { pointers.remove(e.pointer); if (pointers.isEmpty) onUp(); },
+      onPointerCancel: (e) { pointers.remove(e.pointer); if (pointers.isEmpty) onUp(); },
       child: Container(
         width: 74, height: 24,
         alignment: Alignment.center,
@@ -265,10 +266,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
   }
 
   Widget _shoulder(String label, VoidCallback onDown, VoidCallback onUp) {
-    return GestureDetector(
-      onTapDown: (_) => onDown(),
-      onTapUp: (_) => onUp(),
-      onTapCancel: onUp,
+    final pointers = <int>{};
+    return Listener(
+      onPointerDown: (e) { pointers.add(e.pointer); onDown(); },
+      onPointerUp: (e) { pointers.remove(e.pointer); if (pointers.isEmpty) onUp(); },
+      onPointerCancel: (e) { pointers.remove(e.pointer); if (pointers.isEmpty) onUp(); },
       child: Container(
         width: 84, height: 30, alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -356,15 +358,33 @@ class _GlowButton extends StatefulWidget {
 
 class _GlowButtonState extends State<_GlowButton> {
   bool _pressed = false;
+  // Track pointers per button: a pointer down on THIS button keeps it held until that
+  // pointer lifts — no gesture-arena "slop" cancellation, true multi-touch.
+  final Set<int> _pointers = {};
+
+  void _down(int pointer) {
+    _pointers.add(pointer);
+    if (!_pressed) { setState(() => _pressed = true); widget.onDown(); }
+  }
+
+  void _up(int pointer) {
+    _pointers.remove(pointer);
+    if (_pointers.isEmpty && _pressed) {
+      setState(() => _pressed = false);
+      widget.onUp();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final active = _pressed || widget.held;
     final dim = widget.translucent ? .16 : .30;
-    return GestureDetector(
-      onTapDown: (_) { setState(() => _pressed = true); widget.onDown(); },
-      onTapUp: (_) { setState(() => _pressed = false); widget.onUp(); },
-      onTapCancel: () { setState(() => _pressed = false); widget.onUp(); },
+    return Listener(
+      onPointerDown: (e) => _down(e.pointer),
+      onPointerUp: (e) => _up(e.pointer),
+      onPointerCancel: (e) => _up(e.pointer),
+      // Pointer moving away does NOT release (a real gamepad doesn't either) — the
+      // button stays held until the finger lifts. Prevents the "stuck/loose" feel.
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 90),
         width: widget.width,
