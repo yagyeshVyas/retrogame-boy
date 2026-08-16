@@ -222,6 +222,11 @@ object LibRetro {
                                     scaled = android.graphics.Bitmap.createScaledBitmap(
                                         bitmap!!, w * s, h * s, false)
                                     scaledKey = key
+                                    // KEY SMOOTHNESS TRICK: pin the surface buffer to the
+                                    // game's own (integer-scaled) size. The canvas is then a
+                                    // pure 1:1 blit every frame, and the TV's display scaler
+                                    // (hardware) does the upscale — no per-frame CPU scaling.
+                                    try { sh.setFixedSize(w * s, h * s) } catch (_: Exception) {}
                                 }
                             }
                             drawFrame(bitmap, scaled)
@@ -263,16 +268,22 @@ object LibRetro {
         try {
             holderWidth = canvas.width; holderHeight = canvas.height
             canvas.drawColor(android.graphics.Color.BLACK)
-            val vw = canvas.width.toFloat()
-            val vh = canvas.height.toFloat()
-            val ar = src.width.toFloat() / src.height.toFloat()
-            var dw = vw
-            var dh = vw / ar
-            if (dh > vh) { dh = vh; dw = vh * ar }
-            val left = (vw - dw) / 2f
-            val top = (vh - dh) / 2f
-            canvas.drawBitmap(src, null,
-                android.graphics.RectF(left, top, left + dw, top + dh), null)
+            // Fast path: surface buffer is pinned to the game size -> pure 1:1 blit.
+            if (canvas.width == src.width && canvas.height == src.height) {
+                canvas.drawBitmap(src, 0f, 0f, null)
+            } else {
+                // Fallback (first frames): center with aspect ratio preserved.
+                val vw = canvas.width.toFloat()
+                val vh = canvas.height.toFloat()
+                val ar = src.width.toFloat() / src.height.toFloat()
+                var dw = vw
+                var dh = vw / ar
+                if (dh > vh) { dh = vh; dw = vh * ar }
+                val left = (vw - dw) / 2f
+                val top = (vh - dh) / 2f
+                canvas.drawBitmap(src, null,
+                    android.graphics.RectF(left, top, left + dw, top + dh), null)
+            }
         } finally {
             try { holder.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
         }
