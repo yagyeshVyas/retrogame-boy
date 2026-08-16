@@ -270,14 +270,15 @@ object LibRetro {
         val canvas = try { holder.lockCanvas() } catch (_: Exception) { return } ?: return
         try {
             holderWidth = canvas.width; holderHeight = canvas.height
-            canvas.drawColor(android.graphics.Color.BLACK)
-            // Pinned surface: canvas == integer-scaled game size -> draw 1:1 (cheap blit).
+            // Pinned surface: canvas == integer-scaled game size -> draw 1:1 (cheap blit),
+            // no letterbox, no black fill needed (skips a full-canvas clear every frame).
             if (pinnedSurface && canvas.width % b.width == 0 && canvas.height % b.height == 0) {
                 canvas.drawBitmap(b, null,
                     android.graphics.RectF(0f, 0f,
                         canvas.width.toFloat(), canvas.height.toFloat()), paint)
             } else {
-                // Fallback (first frames before pinning): center with aspect ratio kept.
+                // Fallback (first frames before pinning): clear + center, aspect kept.
+                canvas.drawColor(android.graphics.Color.BLACK)
                 val vw = canvas.width.toFloat()
                 val vh = canvas.height.toFloat()
                 val ar = b.width.toFloat() / b.height.toFloat()

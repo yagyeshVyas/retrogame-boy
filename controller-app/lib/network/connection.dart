@@ -25,7 +25,8 @@ class Connection extends ChangeNotifier {
   StreamSubscription? _sub;
   Timer? _reconnect;
   Timer? _ping;
-  bool _closed = false;
+  bool _closed = false;       // true after dispose — never reconnect
+  bool _handlingClose = false; // guard: onError + onDone fire for the SAME close
   int _attempt = 0;
 
   Connection({
@@ -38,23 +39,26 @@ class Connection extends ChangeNotifier {
   String get _url => 'ws://$host:$port';
 
   Future<void> connect() async {
-    _closed = false;
+    if (_closed) return; // disposed — never revive
+    _handlingClose = false;
     _set(ConnState.connecting);
     _open();
   }
 
   void _open() {
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(_url));
-      _channel!.sink.add(jsonEncode(HelloMessage(device: deviceLabel, player: player).toJson()));
-      _sub = _channel!.stream.listen(
+      final ch = WebSocketChannel.connect(Uri.parse(_url));
+      _channel = ch;
+      ch.sink.add(jsonEncode(HelloMessage(device: deviceLabel, player: player).toJson()));
+      _sub = ch.stream.listen(
         _onData,
         onError: (_) => _onClosed(),
         onDone: _onClosed,
         cancelOnError: true,
       );
-      _set(ConnState.connected);
       _attempt = 0;
+      _set(ConnState.connected);
+      _ping?.cancel();
       _ping = Timer.periodic(const Duration(seconds: 1), _sendPing);
     } catch (_) {
       _onClosed();
@@ -112,10 +116,17 @@ class Connection extends ChangeNotifier {
     return true;
   }
 
+  /// Handle a socket close exactly ONCE (onError and onDone both fire for the
+  /// same close — without this guard we'd loop and spawn duplicate timers).
   void _onClosed() {
     if (_closed) return;
-    _channel?.sink.close();
+    if (_handlingClose) return;
+    _handlingClose = true;
     _ping?.cancel();
+    _sub?.cancel();
+    _sub = null;
+    _channel?.sink.close();
+    _channel = null;
     _set(state == ConnState.connected ? ConnState.reconnecting : ConnState.disconnected);
     _scheduleReconnect();
   }
@@ -133,6 +144,7 @@ class Connection extends ChangeNotifier {
   @override
   void dispose() {
     _closed = true;
+    _handlingClose = true;
     _reconnect?.cancel();
     _ping?.cancel();
     _sub?.cancel();

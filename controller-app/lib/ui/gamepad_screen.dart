@@ -25,14 +25,33 @@ class _GamepadScreenState extends State<GamepadScreen> {
     super.initState();
     _conn = Connection(host: widget.host, port: widget.port, player: widget.player)
       ..deviceLabel = 'FlutterController-${widget.player}'
-      ..addListener(() => setState(() {}));
+      ..addListener(_onConnChanged);
     _conn.connect();
     SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
+  /// Connection state changed: when the link drops, release every held button so
+  /// the phone and TV never desync (a held button after reconnect = stuck controls).
+  void _onConnChanged() {
+    if (!mounted) return;
+    final st = _conn.state;
+    if (st == ConnState.reconnecting || st == ConnState.disconnected) {
+      if (_held.isNotEmpty) {
+        for (final b in _held.toList()) {
+          _conn.input(b, 'up'); // best-effort release over the dying socket
+        }
+        setState(_held.clear);
+      }
+    } else if (st == ConnState.connected) {
+      if (_held.isNotEmpty) setState(_held.clear); // fresh link: start clean
+    }
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    _conn.removeListener(_onConnChanged);
     _conn.dispose();
     super.dispose();
   }
