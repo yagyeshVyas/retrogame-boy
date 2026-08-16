@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -15,15 +14,25 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+        ndk { abiFilters += listOf("arm64-v8a") } // real Android TVs are arm64; keeps APK lean
         externalNativeBuild {
-            cmake { cppFlags += "-std=c11" }
+            cmake { cFlags += "-std=c11" } // retro_core_jni.c is C
+        }
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug") // sideloadable (debug-key signed)
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -33,19 +42,22 @@ android {
     }
     buildFeatures { compose = false; viewBinding = false }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+                "META-INF/versions/9/module-info.class",
+            )
+        }
+    }
+
     externalNativeBuild {
         cmake { path = file("src/main/jni/CMakeLists.txt") }
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
-    }
-}
-
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
@@ -54,8 +66,10 @@ dependencies {
     implementation("androidx.tvprovider:tvprovider:1.1.0")
     // Ktor WebSocket server
     implementation("io.ktor:ktor-server-core-jvm:2.3.10")
+    implementation("io.ktor:ktor-server-host-common:2.3.10")
     implementation("io.ktor:ktor-server-netty-jvm:2.3.10")
     implementation("io.ktor:ktor-server-websockets-jvm:2.3.10")
+    implementation("io.ktor:ktor-network:2.3.10")
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     // Coroutines

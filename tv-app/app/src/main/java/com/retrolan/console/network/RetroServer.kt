@@ -2,7 +2,7 @@ package com.retrolan.console.network
 
 import com.retrolan.console.core.LibRetro
 import io.ktor.server.application.*
-import io.ktor.server.engine.*
+import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
@@ -23,22 +23,30 @@ object RetroServer {
     private const val PORT = 8877
     private const val MAX_PLAYERS = 2
 
-    private var engine: EmbeddedServer<*, *>? = null
     @Volatile var onControllerCount: ((Int) -> Unit)? = null
     private val controllers = mutableSetOf<WebSocketSession>()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // Started/stopped via the running job on the app scope; no typed engine field needed.
+    private var state = State.IDLE
+    private enum class State { IDLE, RUNNING, STOPPED }
+
     @Synchronized
     fun start() {
-        if (engine != null) return
+        if (state == State.RUNNING) return
+        state = State.RUNNING
         val name = android.os.Build.MODEL
-        engine = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
+        val server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
             install(WebSockets)
             routing {
                 webSocket("/") { handle(this, name) }
             }
         }
-        scope.launch { engine?.start(wait = false) }
+        scope.launch {
+            try {
+                server.start(wait = true) // blocks until stopped; runs on this coroutine
+            } catch (_: Exception) {}
+        }
     }
 
     private suspend fun handle(ws: DefaultWebSocketSession, name: String) {
@@ -99,8 +107,7 @@ object RetroServer {
 
     @Synchronized
     fun stop() {
+        state = State.STOPPED
         scope.cancel()
-        engine?.stop(1000, 5000)
-        engine = null
     }
 }

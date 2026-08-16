@@ -55,3 +55,15 @@ dist/*.aab
 # local build env (machine-specific paths)
 env.sh
 release-assets/
+
+# Vendored libretro core binaries (large GPL .so) — fetched via scripts/fetch-cores.sh
+controller-app/../tv-app/app/src/main/jniLibs/
+tv-app/app/src/main/jniLibs/
+
+# Native build intermediates
+controller-app/android/.cxx/
+controller-app/android/app/.cxx/
+controller-app/android/.gradle/
+tv-app/app/.cxx/
+tv-app/app/build/
+tv-app/.gradle/
