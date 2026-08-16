@@ -111,17 +111,17 @@ class _GamepadScreenState extends State<GamepadScreen> {
             ]),
           ),
           const Spacer(),
-          // Shoulders
+          // Shoulders + Start/Select (momentary: down on touch, up on release)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              _shoulder('L', () => _press('l', !_held.contains('l'))),
+              _shoulder('L', () => _press('l', true), () => _press('l', false)),
               Row(children: [
-                _pillBtn('SELECT', () => _press('select', true)),
+                _pillBtn('SELECT', () => _press('select', true), () => _press('select', false)),
                 const SizedBox(width: 10),
-                _pillBtn('START', () => _press('start', true)),
+                _pillBtn('START', () => _press('start', true), () => _press('start', false)),
               ]),
-              _shoulder('R', () => _press('r', !_held.contains('r'))),
+              _shoulder('R', () => _press('r', true), () => _press('r', false)),
             ]),
           ),
           const SizedBox(height: 24),
@@ -155,9 +155,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
     );
   }
 
-  Widget _pillBtn(String label, VoidCallback onTap) {
+  Widget _pillBtn(String label, VoidCallback onDown, VoidCallback onUp) {
     return GestureDetector(
-      onTapDown: (_) => onTap(),
+      onTapDown: (_) => onDown(),
+      onTapUp: (_) => onUp(),
+      onTapCancel: onUp,
       child: Container(
         width: 74, height: 24,
         alignment: Alignment.center,
@@ -171,9 +173,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
     );
   }
 
-  Widget _shoulder(String label, VoidCallback onTap) {
+  Widget _shoulder(String label, VoidCallback onDown, VoidCallback onUp) {
     return GestureDetector(
-      onTapDown: (_) => onTap(),
+      onTapDown: (_) => onDown(),
+      onTapUp: (_) => onUp(),
+      onTapCancel: onUp,
       child: Container(
         width: 84, height: 30, alignment: Alignment.center,
         decoration: BoxDecoration(
