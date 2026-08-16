@@ -14,9 +14,9 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // Universal build: bundle BOTH ABIs so ONE APK works on any Android TV/ONN box.
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
-        // ABI selection handled by the splits block below (arm64 + x86_64, per-ABI APKs).
+        // Universal build: bundle arm64-v8a + x86_64 + armeabi-v7a so ONE APK works on
+        // any Android TV / Google TV / ONN box — including 32-bit ARM devices like this ONN.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a") }
         externalNativeBuild {
             cmake { cFlags += "-std=c11" } // retro_core_jni.c is C
         }
