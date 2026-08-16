@@ -22,6 +22,8 @@ class RomAdapter(
     @SuppressLint("NotifyDataSetChanged")
     fun submit(list: List<RomEntry>) { items.clear(); items.addAll(list); notifyDataSetChanged() }
 
+    fun getItems(): List<RomEntry> = items.toList()
+
     class VH(view: View, private val click: (RomEntry) -> Unit) : RecyclerView.ViewHolder(view) {
         private val title: TextView = view.findViewById(R.id.rom_title)
         private val system: TextView = view.findViewById(R.id.rom_system)

@@ -43,6 +43,28 @@ class _GamepadScreenState extends State<GamepadScreen> {
     _conn.input(button, down ? 'down' : 'up');
   }
 
+  /// Pick a local ROM on the phone (via native Android file picker) and send it to
+  /// the TV over Wi-Fi to play. Uses a MethodChannel to the host MainActivity, so no
+  /// third-party picker plugin is needed.
+  Future<void> _sendRom() async {
+    if (_conn.state != ConnState.connected) return;
+    const channel = MethodChannel('retrolan/filepicker');
+    try {
+      final Map<dynamic, dynamic>? picked =
+          await channel.invokeMethod('pickFile') as Map<dynamic, dynamic>?;
+      if (picked == null || picked.isEmpty) return; // user cancelled
+      final name = picked['name'] as String;
+      final bytes = (picked['bytes'] as List<dynamic>).cast<int>();
+      final ok = _conn.sendRom(name, bytes);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? 'Sending $name to TV…' : 'Not connected to TV')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Send failed: $e')));
+    }
+  }
+
   String get _statusText {
     switch (_conn.state) {
       case ConnState.connected: return _conn.tvName ?? 'Connected';
@@ -59,12 +81,33 @@ class _GamepadScreenState extends State<GamepadScreen> {
       backgroundColor: kBg,
       body: SafeArea(
         child: Column(children: [
-          // Status pill: TV name + live latency
+          // Status pill: TV name + live latency + send-ROM action
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               _pill(icon: Icons.circle, color: connected ? kGreen : kAmber, text: _statusText),
-              _pill(icon: Icons.bolt, color: kCyan, text: '${_conn.latencyMs} ms'),
+              Row(children: [
+                if (connected) ...[
+                  GestureDetector(
+                    onTap: _sendRom,
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF17171F),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.white.withOpacity(.14)),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                        Icon(Icons.upload_file, size: 14, color: kCyan),
+                        SizedBox(width: 6),
+                        Text('Send ROM', style: TextStyle(color: kInk, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ),
+                ],
+                _pill(icon: Icons.bolt, color: kCyan, text: '${_conn.latencyMs} ms'),
+              ]),
             ]),
           ),
           const Spacer(),

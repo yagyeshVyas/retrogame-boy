@@ -84,6 +84,28 @@ class Connection extends ChangeNotifier {
     _channel?.sink.add(jsonEncode(InputMessage(player: player, button: button, state: down).toJson()));
   }
 
+  /// Send a ROM file (your own local file) to the TV over Wi-Fi so the TV plays it.
+  /// Header -> binary bytes -> end marker. Returns true if the transfer was sent.
+  bool sendRom(String fileName, List<int> bytes) {
+    if (state != ConnState.connected) return false;
+    final ws = _channel;
+    if (ws == null) return false;
+    // Header declares the filename; TV reads the following binary frames as the ROM.
+    ws.sink.add(jsonEncode({
+      'type': 'rom_upload',
+      'name': fileName,
+    }));
+    // Send the file bytes as raw binary (split into chunks for large ROMs).
+    const chunk = 64 * 1024;
+    for (var i = 0; i < bytes.length; i += chunk) {
+      final end = (i + chunk < bytes.length) ? i + chunk : bytes.length;
+      ws.sink.add(bytes.sublist(i, end));
+    }
+    // Signal completion; TV saves + plays.
+    ws.sink.add(jsonEncode({'type': 'rom_end', 'name': fileName}));
+    return true;
+  }
+
   void _onClosed() {
     if (_closed) return;
     _channel?.sink.close();

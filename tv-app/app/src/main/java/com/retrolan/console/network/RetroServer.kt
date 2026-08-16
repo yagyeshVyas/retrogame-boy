@@ -24,6 +24,8 @@ object RetroServer {
     private const val MAX_PLAYERS = 2
 
     @Volatile var onControllerCount: ((Int) -> Unit)? = null
+    @Volatile var onRomReceived: ((String) -> Unit)? = null   // called with saved filename after upload
+    @Volatile var romDir: java.io.File? = null                // where sent ROMs are saved (app files dir)
     private val controllers = mutableSetOf<WebSocketSession>()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -52,18 +54,68 @@ object RetroServer {
     private suspend fun handle(ws: DefaultWebSocketSession, name: String) {
         controllers.add(ws)
         onControllerCount?.invoke(controllers.size)
+        // Pending ROM upload state (filename -> accumulating bytes)
+        var uploadName: String? = null
+        val uploadBytes = java.io.ByteArrayOutputStream()
         try {
             ws.send(jsonString("hello_ack", mapOf("name" to name, "cores" to com.retrolan.console.core.Cores.defaultHelloCores)))
             for (frame in ws.incoming) {
-                if (frame !is Frame.Text) continue
-                val text = frame.readText()
-                process(text, ws)
+                when (frame) {
+                    is Frame.Text -> {
+                        val text = frame.readText()
+                        // Parse JSON header
+                        try {
+                            val obj = Json.parseToJsonElement(text).jsonObject
+                            when (obj["type"]?.jsonPrimitive?.content) {
+                                "rom_upload" -> {
+                                    val nm = obj["name"]?.jsonPrimitive?.content
+                                    if (!nm.isNullOrEmpty()) { uploadName = nm; uploadBytes.reset() }
+                                }
+                                "rom_end" -> {
+                                    // Finished receiving a ROM — save + play now (connection still open).
+                                    val nm = uploadName
+                                    val bytes = uploadBytes.toByteArray()
+                                    if (nm != null && bytes.isNotEmpty()) {
+                                        saveAndPlay(nm, bytes, ws)
+                                        uploadName = null; uploadBytes.reset()
+                                    }
+                                }
+                                else -> process(text, ws)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    is Frame.Binary -> {
+                        val bytes = frame.readBytes()
+                        if (uploadName != null) uploadBytes.write(bytes)
+                    }
+                    else -> {}
+                }
             }
         } catch (_: Exception) {
             // disconnected
         } finally {
+            // On close, if we received a full ROM, save + play it.
+            if (uploadName != null && uploadBytes.size() > 0) {
+                saveAndPlay(uploadName!!, uploadBytes.toByteArray(), ws)
+            }
             controllers.remove(ws)
             onControllerCount?.invoke(controllers.size)
+        }
+    }
+
+    /** Save a received ROM to the app's own files dir and auto-load + play it. */
+    private suspend fun saveAndPlay(name: String, bytes: ByteArray, ws: DefaultWebSocketSession) {
+        try {
+            val dir = romDir ?: android.os.Environment.getExternalStorageDirectory()
+            dir.mkdirs()
+            val safe = name.replace("../", "_").replace("/", "_")
+            val out = java.io.File(dir, safe)
+            out.writeBytes(bytes)
+            android.util.Log.i(TAG, "received ROM $name (${bytes.size} B) -> ${out.absolutePath}")
+            ws.send(jsonString("rom_ack", mapOf("name" to safe, "size" to bytes.size)))
+            onRomReceived?.invoke(safe)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "save ROM failed: ${e.message}")
         }
     }
 

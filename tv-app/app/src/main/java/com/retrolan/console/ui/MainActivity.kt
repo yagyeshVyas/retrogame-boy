@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
@@ -82,9 +83,20 @@ class MainActivity : AppCompatActivity() {
         }
 
         // LAN services (WebSocket for the phone controller + mDNS advertise so phones find us).
+        RetroServer.romDir = java.io.File(getExternalFilesDir(null), "roms")
+        RetroServer.onRomReceived = { name -> runOnUiThread { onReceivedRom(name) } }
         RetroServer.start()
         advertiser = RetroAdvertiser(this).also { it.start() }
         LibRetro.coreLibraryDir = File(applicationInfo.nativeLibraryDir)
+    }
+
+    /** A ROM was sent from the phone over Wi-Fi — add it to the library and launch it. */
+    private fun onReceivedRom(name: String) {
+        val file = java.io.File(java.io.File(getExternalFilesDir(null), "roms"), name)
+        val rom = RomEntry(name, Uri.fromFile(file), systemFor(name))
+        adapter?.submit(listOf(rom) + (adapter?.getItems() ?: emptyList()).filter { it.name != name })
+        Toast.makeText(this, "Received $name — launching", Toast.LENGTH_SHORT).show()
+        launch(rom)
     }
 
     /** Re-scan the persisted folder and refresh the grid. Never crashes on a stale URI. */
