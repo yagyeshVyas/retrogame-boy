@@ -23,19 +23,24 @@ android {
     }
 
     signingConfigs {
-        getByName("debug") {
-            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        // REAL release keystore — some Android TV / Google TV installers reject debug-signed
+        // APKs as "incompatible", so a proper release signature is required for max install success.
+        create("release") {
+            storeFile = file("$rootDir/../keystore/retrolan-release.keystore")
+            storePassword = "retrolan123"
+            keyAlias = "retrolan"
+            keyPassword = "retrolan123"
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug") // sideloadable (debug-key signed)
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {

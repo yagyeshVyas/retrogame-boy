@@ -68,3 +68,9 @@ tv-app/app/.cxx/
 tv-app/app/build/
 tv-app/.gradle/
 test-roms/
+
+# Signing secrets — NEVER commit
+tv-app/../keystore/
+keystore/
+*.keystore
+*.jks
