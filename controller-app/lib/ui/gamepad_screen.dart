@@ -18,6 +18,7 @@ class GamepadScreen extends StatefulWidget {
 class _GamepadScreenState extends State<GamepadScreen> {
   late final Connection _conn;
   final Set<String> _held = {}; // dedupe: avoid re-sending down for a held button
+  bool _abSwap = false;         // swap A<->B (NES: jump is usually B)
 
   @override
   void initState() {
@@ -38,6 +39,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
 
   void _press(String button, bool down) {
     HapticFeedback.lightImpact(); // haptic on every press
+    // A/B swap for games where jump is on B (NES convention) — remap before sending.
+    if (_abSwap) {
+      if (button == 'a') button = 'b';
+      else if (button == 'b') button = 'a';
+    }
     if (down == _held.contains(button)) return; // no change -> skip
     setState(() { down ? _held.add(button) : _held.remove(button); });
     _conn.input(button, down ? 'down' : 'up');
@@ -102,6 +108,28 @@ class _GamepadScreenState extends State<GamepadScreen> {
                         Icon(Icons.upload_file, size: 14, color: kCyan),
                         SizedBox(width: 6),
                         Text('Send ROM', style: TextStyle(color: kInk, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => setState(() => _abSwap = !_abSwap),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _abSwap ? const Color(0xFF1D2B22) : const Color(0xFF17171F),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: (_abSwap ? kGreen : Colors.white).withValues(alpha: .25)),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.swap_horiz, size: 14,
+                             color: _abSwap ? kGreen : kMuted),
+                        const SizedBox(width: 6),
+                        Text(_abSwap ? 'A⇄B ON' : 'A⇄B',
+                          style: TextStyle(
+                            color: _abSwap ? kGreen : kMuted,
+                            fontSize: 12, fontWeight: FontWeight.w600)),
                       ]),
                     ),
                   ),
@@ -253,12 +281,12 @@ class _GamepadScreenState extends State<GamepadScreen> {
   // ---------- Face buttons ----------
   Widget _face() {
     return SizedBox(
-      width: 230, height: 200,
+      width: 230, height: 210,
       child: Stack(children: [
-        _faceBtn('a', 84, 132, kGreen),
-        _faceBtn('b', 16, 86, kPurple),
-        _faceBtn('y', 84, 40, kPurple),
-        _faceBtn('x', 152, 86, kPurple),
+        _faceBtn('a', 84, 138, kGreen),
+        _faceBtn('b', 6, 92, kPurple),
+        _faceBtn('y', 84, 46, kPurple),
+        _faceBtn('x', 162, 92, kPurple),
       ]),
     );
   }
@@ -270,6 +298,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
         color: accent, held: _held.contains(btn),
         onDown: () => _press(btn, true), onUp: () => _press(btn, false),
         circle: true, label: btn.toUpperCase(),
+        width: 64, height: 64,   // big reliable tap target (was tiny before)
       ),
     );
   }
@@ -285,9 +314,12 @@ class _GlowButton extends StatefulWidget {
   final String? label;
   final double radius;
   final bool translucent;
+  final double? width;
+  final double? height;
   const _GlowButton({
     required this.color, required this.held, required this.onDown, required this.onUp,
     this.circle = false, this.label, this.radius = 14, this.translucent = false,
+    this.width, this.height,
   });
 
   @override
@@ -307,6 +339,8 @@ class _GlowButtonState extends State<_GlowButton> {
       onTapCancel: () { setState(() => _pressed = false); widget.onUp(); },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 90),
+        width: widget.width,
+        height: widget.height,
         decoration: BoxDecoration(
           shape: widget.circle ? BoxShape.circle : BoxShape.rectangle,
           borderRadius: widget.circle ? null : BorderRadius.circular(widget.radius),
