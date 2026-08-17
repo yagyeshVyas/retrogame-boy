@@ -84,8 +84,10 @@ class _GamepadScreenState extends State<GamepadScreen> {
     super.dispose();
   }
 
-  void _press(String button, bool down, {bool haptic = true}) {
-    if (haptic) HapticFeedback.lightImpact(); // haptic on every press
+  void _press(String button, bool down, {bool haptic = false}) {
+    // Haptics OFF for game buttons by default: the vibration motor adds perceived
+    // input lag (touch -> vibrate -> release feels slow). Only menu actions buzz.
+    if (haptic) HapticFeedback.lightImpact();
     // A/B swap for games where jump is on B (NES convention) — remap before sending.
     if (_abSwap) {
       if (button == 'a') button = 'b';

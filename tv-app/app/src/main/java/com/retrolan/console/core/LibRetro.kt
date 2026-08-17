@@ -164,7 +164,8 @@ object LibRetro {
                 val minBuf = android.media.AudioTrack.getMinBufferSize(
                     rate, android.media.AudioFormat.CHANNEL_OUT_STEREO,
                     android.media.AudioFormat.ENCODING_PCM_16BIT)
-                // 2x min buffer: low latency (no late sound) with enough headroom.
+                // 4x min buffer: big headroom so the AudioTrack never underruns
+                // (underruns = stuttery/choppy sound that FEELS like game lag).
                 at = android.media.AudioTrack(
                     android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
@@ -175,7 +176,7 @@ object LibRetro {
                         .setSampleRate(rate)
                         .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_STEREO)
                         .build(),
-                    (minBuf * 2).coerceAtLeast(32 * 1024),
+                    (minBuf * 4).coerceAtLeast(64 * 1024),
                     android.media.AudioTrack.MODE_STREAM, 0)
                 at.play()
                 while (running) {
