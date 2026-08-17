@@ -189,7 +189,6 @@ object LibRetro {
             try { at?.stop(); at?.release() } catch (_: Exception) {}
         }
         emuThread = thread(name = "retro-run") {
-            val frameMs = 16L // ~60fps target; loop adapts if the device is slow
             var bitmap: android.graphics.Bitmap? = null
             // Nearest-neighbor paint: crisp NES pixels AND much cheaper than bilinear.
             val paint = android.graphics.Paint().apply { isFilterBitmap = false }
@@ -262,10 +261,18 @@ object LibRetro {
                     Log.i(TAG, "fps=${fpsAccum * 1000L / ((now - fpsT0) / 1_000_000)}")
                     fpsAccum = 0; fpsT0 = now
                 }
-                val elapsed = (System.nanoTime() - t0) / 1_000_000
-                // Adaptive pacing: hold ~60fps when fast enough; never spin on slow devices.
-                val sleep = if (elapsed < frameMs) (frameMs - elapsed).coerceAtLeast(1) else 0L
-                if (sleep > 0) { try { Thread.sleep(sleep) } catch (_: InterruptedException) { break } }
+                val elapsed = (System.nanoTime() - t0)
+                // Precise pacing: coarse Thread.sleep + sub-millisecond parkNanos.
+                // Thread.sleep alone overshoots wildly on Android (a 2ms sleep can take
+                // 8-15ms), which made the 60fps loop stutter between ~60 and ~45fps —
+                // the "little laggy" feel even though fps looked fine.
+                val sleepNs = 16_666_667L - elapsed
+                if (sleepNs > 0) {
+                    try {
+                        Thread.sleep(sleepNs / 1_000_000L)
+                        java.util.concurrent.locks.LockSupport.parkNanos(sleepNs % 1_000_000L)
+                    } catch (_: InterruptedException) { break }
+                }
             }
             audioQueue.clear()
         }
