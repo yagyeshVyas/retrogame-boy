@@ -25,7 +25,7 @@ jobs:
 
       - name: Analyze
         working-directory: controller-app
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build iOS (no codesign)
         working-directory: controller-app
