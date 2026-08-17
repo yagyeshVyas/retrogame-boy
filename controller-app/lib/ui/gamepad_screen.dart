@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart' show kBg, kPurple, kCyan, kGreen, kAmber, kInk, kMuted;
@@ -82,8 +84,8 @@ class _GamepadScreenState extends State<GamepadScreen> {
     super.dispose();
   }
 
-  void _press(String button, bool down) {
-    HapticFeedback.lightImpact(); // haptic on every press
+  void _press(String button, bool down, {bool haptic = true}) {
+    if (haptic) HapticFeedback.lightImpact(); // haptic on every press
     // A/B swap for games where jump is on B (NES convention) — remap before sending.
     if (_abSwap) {
       if (button == 'a') button = 'b';
@@ -301,28 +303,127 @@ class _GamepadScreenState extends State<GamepadScreen> {
   }
 
   // ---------- D-pad ----------
+  // ---------- Round 360° pad ----------
+  // Touch anywhere on the circle; the position maps to 8-way direction (diagonals
+  // included, like a real analog stick). Center = neutral, edges = full direction.
+  final Set<String> _padActive = {};
+
   Widget _dPad() {
-    return SizedBox(
-      width: 190, height: 190,
-      child: Stack(children: [
-        _dpadArm('dpad_up',   66, 0, 58, 62),
-        _dpadArm('dpad_down', 66, 190 - 62, 58, 62),
-        _dpadArm('dpad_left', 0, 66, 62, 58),
-        _dpadArm('dpad_right',190 - 62, 66, 62, 58),
-        Center(child: Container(width: 56, height: 56, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .05), borderRadius: BorderRadius.circular(12)))),
-      ]),
+    const size = 190.0;
+    const c = size / 2;
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (e) => _padMove(e),
+      onPointerMove: (e) => _padMove(e),
+      onPointerUp: (_) => _padClear(),
+      onPointerCancel: (_) => _padClear(),
+      child: Container(
+        width: size, height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFF121218),
+          border: Border.all(color: Colors.white.withValues(alpha: .10)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: .45), blurRadius: 18, offset: const Offset(0, 6)),
+            BoxShadow(color: kCyan.withValues(alpha: _padActive.isEmpty ? .05 : .22), blurRadius: 30),
+          ],
+        ),
+        child: Stack(alignment: Alignment.center, children: [
+          // direction guides (visual only) — light up when that direction is active
+          _padGuide('dpad_up',    c - 29, 0,      58, 62),
+          _padGuide('dpad_down',  c - 29, size - 62, 58, 62),
+          _padGuide('dpad_left',  0,      c - 29, 62, 58),
+          _padGuide('dpad_right', size - 62, c - 29, 62, 58),
+          // diagonal guide dots (NW NE SW SE)
+          _padDot('dpad_up_left',    c - 66, c - 66),
+          _padDot('dpad_up_right',   c + 20, c - 66),
+          _padDot('dpad_down_left',  c - 66, c + 20),
+          _padDot('dpad_down_right', c + 20, c + 20),
+          // center nub (neutral)
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: .06),
+              border: Border.all(color: Colors.white.withValues(alpha: .12)),
+            ),
+          ),
+        ]),
+      ),
     );
   }
 
-  Widget _dpadArm(String btn, double l, double t, double wdt, double hgt) {
+  Widget _padGuide(String btn, double l, double t, double wdt, double hgt) {
+    final on = _held.contains(btn);
     return Positioned(
       left: l, top: t, width: wdt, height: hgt,
-      child: _GlowButton(
-        color: kCyan, held: _held.contains(btn),
-        onDown: () => _press(btn, true), onUp: () => _press(btn, false),
-        radius: 14, translucent: true,
+      child: IgnorePointer(
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: kCyan.withValues(alpha: on ? .55 : .08),
+            border: Border.all(color: kCyan.withValues(alpha: on ? .9 : .12)),
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _padDot(String btn, double l, double t) {
+    final on = _held.contains(btn);
+    return Positioned(
+      left: l, top: t,
+      child: IgnorePointer(
+        child: Container(
+          width: 14, height: 14,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: on ? kCyan.withValues(alpha: .9) : Colors.white.withValues(alpha: .08),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Map a pointer position inside the pad to an 8-way direction set.
+  void _padMove(PointerEvent e) {
+    const size = 190.0;
+    const c = size / 2;
+    final dx = e.localPosition.dx - c;
+    final dy = e.localPosition.dy - c;
+    final dist = math.sqrt(dx * dx + dy * dy);
+    Set<String> target = {};
+    if (dist > 26) { // center dead zone = neutral
+      var deg = (math.atan2(dy, dx) * 180 / math.pi + 360) % 360;
+      if (deg < 22.5 || deg >= 337.5) {
+        target = {'dpad_right'};
+      } else if (deg < 67.5) {
+        target = {'dpad_down', 'dpad_right'};
+      } else if (deg < 112.5) {
+        target = {'dpad_down'};
+      } else if (deg < 157.5) {
+        target = {'dpad_down', 'dpad_left'};
+      } else if (deg < 202.5) {
+        target = {'dpad_left'};
+      } else if (deg < 247.5) {
+        target = {'dpad_up', 'dpad_left'};
+      } else if (deg < 292.5) {
+        target = {'dpad_up'};
+      } else {
+        target = {'dpad_up', 'dpad_right'};
+      }
+    }
+    // Diff against what's active: press new, release removed.
+    for (final b in _padActive.difference(target)) { _press(b, false, haptic: false); }
+    for (final b in target.difference(_padActive)) { _press(b, true, haptic: false); }
+    _padActive
+      ..clear()
+      ..addAll(target);
+  }
+
+  void _padClear() {
+    for (final b in _padActive) { _press(b, false, haptic: false); }
+    _padActive.clear();
   }
 
   // ---------- Face buttons ----------
