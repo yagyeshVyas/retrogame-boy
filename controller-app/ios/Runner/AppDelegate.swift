@@ -28,13 +28,15 @@ import UniformTypeIdentifiers
 
         // Register our host channels through the plugin registry so they get the
         // engine's binary messenger (works across Flutter versions).
-        let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "RetroLANHost")
+        guard let registrar = engineBridge.pluginRegistry
+            .registrar(forPlugin: "RetroLANHost") else { return }
+        let messenger = registrar.messenger()
 
         // File picker + chunked reader channel
         let fileChannel = FlutterMethodChannel(
             name: "retrolan/filepicker",
-            binaryMessenger: registrar.messenger())
-        fileChannel.setMethodCallHandler { [weak self] call, result in
+            binaryMessenger: messenger)
+        fileChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
             switch call.method {
             case "pickFile":
                 self?.pendingResult = result
@@ -57,8 +59,8 @@ import UniformTypeIdentifiers
         // Service channel: no-op on iOS (only Android kills background apps).
         let serviceChannel = FlutterMethodChannel(
             name: "retrolan/service",
-            binaryMessenger: registrar.messenger())
-        serviceChannel.setMethodCallHandler { _, result in
+            binaryMessenger: messenger)
+        serviceChannel.setMethodCallHandler { (_: FlutterMethodCall, result: @escaping FlutterResult) in
             result(true)
         }
     }
