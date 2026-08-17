@@ -130,14 +130,23 @@ class Connection extends ChangeNotifier {
     var sent = 0;
     while (true) {
       // Pull one chunk from native (content URI) — never more than 256KB in RAM.
-      final List<dynamic>? raw;
+      // Android returns List<int>; iOS returns Uint8List — handle both.
+      final Object? raw;
       try {
-        raw = await _fileChannel.invokeMethod<List<dynamic>>('readChunk', {
+        raw = await _fileChannel.invokeMethod<Object?>('readChunk', {
           'uri': uri, 'offset': offset, 'length': chunk,
         });
       } catch (_) { break; }
-      if (raw == null || raw.isEmpty) break;
-      final bytes = Uint8List.fromList(raw.cast<int>());
+      if (raw == null) break;
+      final Uint8List bytes;
+      if (raw is Uint8List) {
+        bytes = raw;
+      } else if (raw is List) {
+        bytes = Uint8List.fromList(raw.cast<int>());
+      } else {
+        break;
+      }
+      if (bytes.isEmpty) break;
       ws.sink.add(bytes);
       sent += bytes.length;
       onProgress?.call(sent, size);

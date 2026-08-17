@@ -4,6 +4,14 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- LAN controller: iOS asks the user before local-network access (required to
+	     reach the TV's WebSocket server on :8877). -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>RetroLAN connects to your TV on the local network so you can control games and send ROM files.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_retrolan._tcp</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

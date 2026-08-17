@@ -1,0 +1,45 @@
+name: iOS build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'controller-app/**'
+
+jobs:
+  ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Dependencies
+        working-directory: controller-app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: controller-app
+        run: flutter analyze
+
+      - name: Build iOS (no codesign)
+        working-directory: controller-app
+        run: flutter build ios --release --no-codesign
+
+      - name: Package IPA (unsigned simulator/device build)
+        working-directory: controller-app
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r RetrogameBoy-Phone-iOS.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RetrogameBoy-Phone-iOS
+          path: controller-app/RetrogameBoy-Phone-iOS.ipa
+          if-no-files-found: error
