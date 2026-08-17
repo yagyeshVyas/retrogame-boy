@@ -19,6 +19,7 @@ object LibRetro {
     const val BTN_START = 3; const val BTN_UP = 4; const val BTN_DOWN = 5
     const val BTN_LEFT = 6; const val BTN_RIGHT = 7; const val BTN_A = 8
     const val BTN_X = 9; const val BTN_L = 10; const val BTN_R = 11
+    const val BTN_L2 = 12; const val BTN_R2 = 13
 
     init { System.loadLibrary("retro_bridge") }
 
@@ -325,6 +326,7 @@ object LibRetro {
         "a" -> BTN_A; "b" -> BTN_B; "x" -> BTN_X; "y" -> BTN_Y
         "start" -> BTN_START; "select" -> BTN_SELECT
         "l" -> BTN_L; "r" -> BTN_R
+        "l2" -> BTN_L2; "r2" -> BTN_R2
         "dpad_up" -> BTN_UP; "dpad_down" -> BTN_DOWN
         "dpad_left" -> BTN_LEFT; "dpad_right" -> BTN_RIGHT
         else -> null

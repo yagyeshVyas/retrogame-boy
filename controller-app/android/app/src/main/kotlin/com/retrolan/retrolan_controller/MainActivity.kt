@@ -38,6 +38,12 @@ class MainActivity : FlutterActivity() {
                         pendingResult = result
                         openFilePicker()
                     }
+                    "readChunk" -> {
+                        val uri = call.argument<String>("uri") ?: ""
+                        val offset = (call.argument<Number>("offset")?.toLong()) ?: 0L
+                        val length = (call.argument<Number>("length")?.toInt()) ?: 256 * 1024
+                        readChunk(uri, offset, length, result)
+                    }
                     // Foreground service keeps the controller process alive while
                     // connected — Android can't kill it mid-game (same protection
                     // the TV app has for its WS server).
@@ -73,7 +79,7 @@ class MainActivity : FlutterActivity() {
         if (requestCode == REQ_PICK) {
             val uri: Uri? = data?.data
             if (resultCode == Activity.RESULT_OK && uri != null) {
-                readFile(uri)
+                openPicked(uri)
             } else {
                 // user cancelled
                 pendingResult?.success(null)
@@ -82,28 +88,57 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /** Read the picked file's display name + bytes and hand back to Flutter. */
-    private fun readFile(uri: Uri) {
+    /**
+     * Return the picked file's name + size to Flutter WITHOUT reading its bytes.
+     * Flutter then pulls the content in 256KB chunks via 'readChunk' and streams it
+     * to the TV over WebSocket — huge files (ISO, CHD, CD images) never get loaded
+     * into phone RAM, so no out-of-memory crash on big games.
+     */
+    private fun openPicked(uri: Uri) {
         var name = "game"
+        var size = 0L
         try {
             contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (idx >= 0) cursor.getString(idx)?.let { name = it }
+                    val si = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (si >= 0 && !cursor.isNull(si)) size = cursor.getLong(si)
                 }
             }
         } catch (_: Exception) {}
         try {
-            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
-            val map = HashMap<String, Any>() // ByteArray -> List<Int> for easy Dart transfer
+            val map = HashMap<String, Any>()
             map["name"] = name
-            map["bytes"] = bytes.toList()
+            map["size"] = size
+            map["uri"] = uri.toString()
             pendingResult?.success(map)
         } catch (e: Exception) {
-            pendingResult?.error("read", "Could not read file: ${e.message}", null)
+            pendingResult?.error("read", "Could not open file: ${e.message}", null)
         }
         pendingResult = null
-        Log.i("RetroLAN-Upload", "picked $name (${uri} sized)")
+        Log.i("RetroLAN-Upload", "picked $name (${size}B) — streaming ready")
+    }
+
+    /** Flutter asks for the next chunk of the picked file. */
+    private fun readChunk(uri: String, offset: Long, length: Int, result: MethodChannel.Result) {
+        try {
+            val u = Uri.parse(uri)
+            val bytes = contentResolver.openInputStream(u)?.use { ins ->
+                ins.skip(offset)
+                val buf = ByteArray(length)
+                var read = 0
+                while (read < length) {
+                    val n = ins.read(buf, read, length - read)
+                    if (n < 0) break
+                    read += n
+                }
+                if (read == 0) null else buf.copyOf(read)
+            } ?: ByteArray(0)
+            result.success(bytes.toList())
+        } catch (e: Exception) {
+            result.error("chunk", "read failed: ${e.message}", null)
+        }
     }
 
     companion object {

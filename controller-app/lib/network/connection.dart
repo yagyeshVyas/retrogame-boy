@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -12,6 +13,8 @@ enum ConnState { disconnected, connecting, connected, reconnecting }
 
 /// MethodChannel to the native ControllerService (keeps the app alive while playing).
 const MethodChannel _serviceChannel = MethodChannel('retrolan/service');
+/// MethodChannel to the native file picker + chunked reader (no OOM on big files).
+const MethodChannel _fileChannel = MethodChannel('retrolan/filepicker');
 
 class Connection extends ChangeNotifier {
   ConnState state = ConnState.disconnected;
@@ -111,26 +114,40 @@ class Connection extends ChangeNotifier {
     _channel?.sink.add(jsonEncode({'type': 'control', 'action': action}));
   }
 
-  /// Send a ROM file (your own local file) to the TV over Wi-Fi so the TV plays it.
-  /// Header -> binary bytes -> end marker. Returns true if the transfer was sent.
-  bool sendRom(String fileName, List<int> bytes) {
+  /// Stream a ROM file (your own local file) to the TV over Wi-Fi in 256KB chunks
+  /// so huge files (ISO/CHD/PSX images) never load into phone RAM — no OOM crash.
+  /// `pick` is the result of the native 'pickFile' call: {name, size, uri}.
+  Future<bool> sendRomStream(Map<String, dynamic> pick, {void Function(int, int)? onProgress}) async {
     if (state != ConnState.connected) return false;
     final ws = _channel;
     if (ws == null) return false;
-    // Header declares the filename; TV reads the following binary frames as the ROM.
-    ws.sink.add(jsonEncode({
-      'type': 'rom_upload',
-      'name': fileName,
-    }));
-    // Send the file bytes as raw binary (split into chunks for large ROMs).
-    const chunk = 64 * 1024;
-    for (var i = 0; i < bytes.length; i += chunk) {
-      final end = (i + chunk < bytes.length) ? i + chunk : bytes.length;
-      ws.sink.add(bytes.sublist(i, end));
+    final name = pick['name'] as String? ?? 'game';
+    final size = (pick['size'] as num?)?.toInt() ?? 0;
+    final uri = pick['uri'] as String? ?? '';
+    ws.sink.add(jsonEncode({'type': 'rom_upload', 'name': name}));
+    const chunk = 256 * 1024;
+    var offset = 0;
+    var sent = 0;
+    while (true) {
+      // Pull one chunk from native (content URI) — never more than 256KB in RAM.
+      final List<dynamic>? raw;
+      try {
+        raw = await _fileChannel.invokeMethod<List<dynamic>>('readChunk', {
+          'uri': uri, 'offset': offset, 'length': chunk,
+        });
+      } catch (_) { break; }
+      if (raw == null || raw.isEmpty) break;
+      final bytes = Uint8List.fromList(raw.cast<int>());
+      ws.sink.add(bytes);
+      sent += bytes.length;
+      onProgress?.call(sent, size);
+      if (bytes.length < chunk) break; // last chunk
+      offset += chunk;
+      // Let the socket breathe between chunks (big files, slow Wi-Fi).
+      await Future<void>.delayed(const Duration(milliseconds: 4));
     }
-    // Signal completion; TV saves + plays.
-    ws.sink.add(jsonEncode({'type': 'rom_end', 'name': fileName}));
-    return true;
+    ws.sink.add(jsonEncode({'type': 'rom_end', 'name': name}));
+    return sent > 0;
   }
 
   /// Handle a socket close exactly ONCE (onError and onDone both fire for the

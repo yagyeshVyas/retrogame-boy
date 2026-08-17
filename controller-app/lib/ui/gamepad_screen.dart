@@ -98,7 +98,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
 
   /// Pick a local ROM on the phone (via native Android file picker) and send it to
   /// the TV over Wi-Fi to play. Uses a MethodChannel to the host MainActivity, so no
-  /// third-party picker plugin is needed.
+  /// third-party picker plugin is needed. Streams in 256KB chunks (no OOM on ISOs).
   Future<void> _sendRom() async {
     if (_conn.state != ConnState.connected) return;
     const channel = MethodChannel('retrolan/filepicker');
@@ -107,10 +107,36 @@ class _GamepadScreenState extends State<GamepadScreen> {
           await channel.invokeMethod('pickFile') as Map<dynamic, dynamic>?;
       if (picked == null || picked.isEmpty) return; // user cancelled
       final name = picked['name'] as String;
-      final bytes = (picked['bytes'] as List<dynamic>).cast<int>();
-      final ok = _conn.sendRom(name, bytes);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ok ? 'Sending $name to TV…' : 'Not connected to TV')),
+      final size = (picked['size'] as num?)?.toInt() ?? 0;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Sending $name to TV…'),
+          duration: const Duration(seconds: 30),
+        ),
+      );
+      var lastPct = -1;
+      final ok = await _conn.sendRomStream(
+        Map<String, dynamic>.from(picked),
+        onProgress: (sent, total) {
+          if (total > 0) {
+            final pct = (sent * 100 / total).floor();
+            if (pct != lastPct && pct % 10 == 0) {
+              lastPct = pct;
+              messenger.hideCurrentSnackBar();
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text('Sending $name… $pct% ($size bytes)'),
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            }
+          }
+        },
+      );
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text(ok ? '✓ $name sent — playing on TV' : 'Not connected to TV')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -221,17 +247,25 @@ class _GamepadScreenState extends State<GamepadScreen> {
             ]),
           ),
           const Spacer(),
-          // Shoulders + Start/Select (momentary: down on touch, up on release)
+          // 8 game buttons: L2 L R2 | SELECT START | R (momentary: down/up)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              _shoulder('L', () => _press('l', true), () => _press('l', false)),
+              Row(children: [
+                _shoulder('L2', () => _press('l2', true), () => _press('l2', false)),
+                const SizedBox(width: 8),
+                _shoulder('L', () => _press('l', true), () => _press('l', false)),
+              ]),
               Row(children: [
                 _pillBtn('SELECT', () => _press('select', true), () => _press('select', false)),
                 const SizedBox(width: 10),
                 _pillBtn('START', () => _press('start', true), () => _press('start', false)),
               ]),
-              _shoulder('R', () => _press('r', true), () => _press('r', false)),
+              Row(children: [
+                _shoulder('R', () => _press('r', true), () => _press('r', false)),
+                const SizedBox(width: 8),
+                _shoulder('R2', () => _press('r2', true), () => _press('r2', false)),
+              ]),
             ]),
           ),
           const SizedBox(height: 24),
