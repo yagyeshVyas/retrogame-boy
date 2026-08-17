@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart' show kBg, kPurple, kCyan, kGreen, kAmber, kInk, kMuted;
@@ -66,15 +65,6 @@ class _GamepadScreenState extends State<GamepadScreen> {
       _lastLatencyShown = _conn.latencyMs;
       setState(() {});
     }
-  }
-
-  /// Send 'up' for every held button and clear the set (phone/TV resync).
-  void _releaseAll() {
-    if (_held.isEmpty) return;
-    for (final b in _held.toList()) {
-      _conn.input(b, 'up'); // best-effort release
-    }
-    setState(_held.clear);
   }
 
   @override
